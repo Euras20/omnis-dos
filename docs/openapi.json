@@ -1,0 +1,3219 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OMNIS · DOS Limited API",
+    "description": "Modular monolith ERP backend for DOS Limited.\n\n**Conventions**\n- Base path: `/api/v1`\n- Money fields are integers in minor units (pesewas). Field names end in `Minor`.\n- Business dates are `YYYY-MM-DD`.\n- Resource IDs are UUIDs unless a human-readable business number is used.\n- Every state-changing request requires an `Idempotency-Key` header.\n- Company context is injected from the authenticated user; clients do not send `companyId`.\n- Canonical error shape: `{ \"error\": \"<code>\", \"message\": \"<human>\", \"fields\": {…}, \"requestId\": \"<uuid>\" }`.\n\nSource of truth for behaviour is the frontend review build and the locked architecture documents (Steps 1–13). This document describes the implemented HTTP contract.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "DOS Limited"
+    },
+    "license": {
+      "name": "Proprietary"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "Versioned API base"
+    }
+  ],
+  "tags": [
+    { "name": "Health", "description": "Liveness and readiness probes (unauthenticated)" },
+    { "name": "OpenAPI", "description": "API contract document" },
+    { "name": "Identity", "description": "Current user, roles, permissions, users, access review" },
+    { "name": "Catalog", "description": "Parties, items, locations, tax, FX, templates" },
+    { "name": "Ledger", "description": "Chart of accounts and journals" },
+    { "name": "Receivables", "description": "Customer invoices, receipts, credit notes, refunds" },
+    { "name": "Payables", "description": "Supplier bills and payments" },
+    { "name": "Inventory", "description": "Stock on hand, assignments, deliveries" },
+    { "name": "Sales", "description": "Quotations and sales orders" },
+    { "name": "Procurement", "description": "Purchase orders, goods receipts, QC" },
+    { "name": "Payroll", "description": "Employees and payroll runs" },
+    { "name": "Assets", "description": "Fixed assets and depreciation" },
+    { "name": "Treasury", "description": "Cash expenses and transfers" }
+  ],
+  "paths": {
+    "/health/live": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Liveness probe",
+        "operationId": "healthLive",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Process is alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status"],
+                  "properties": {
+                    "status": { "type": "string", "enum": ["ok"] }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Readiness probe",
+        "operationId": "healthReady",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Process is ready to accept traffic",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status"],
+                  "properties": {
+                    "status": { "type": "string", "enum": ["ok"] }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": ["OpenAPI"],
+        "summary": "OpenAPI 3.1 document",
+        "operationId": "getOpenApi",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OpenAPI document",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          },
+          "404": {
+            "description": "Document not generated yet",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": ["Identity"],
+        "summary": "Current authenticated user profile and effective permissions",
+        "operationId": "getMe",
+        "responses": {
+          "200": {
+            "description": "Current user",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Me" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/admin/permissions": {
+      "get": {
+        "tags": ["Identity"],
+        "summary": "List all permission codes",
+        "operationId": "listPermissions",
+        "responses": {
+          "200": {
+            "description": "Permission catalogue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "code": { "type": "string" },
+                      "description": { "type": "string" },
+                      "module": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/admin/roles": {
+      "get": {
+        "tags": ["Identity"],
+        "summary": "List roles",
+        "operationId": "listRoles",
+        "responses": {
+          "200": {
+            "description": "Roles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Role" }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      },
+      "post": {
+        "tags": ["Identity"],
+        "summary": "Create role",
+        "operationId": "createRole",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["code", "name"],
+                "properties": {
+                  "code": { "type": "string", "maxLength": 64 },
+                  "name": { "type": "string", "maxLength": 255 },
+                  "description": { "type": ["string", "null"] },
+                  "permissionCodes": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Role created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Role" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/admin/roles/{code}": {
+      "put": {
+        "tags": ["Identity"],
+        "summary": "Update role",
+        "operationId": "updateRole",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "maxLength": 255 },
+                  "description": { "type": ["string", "null"] },
+                  "permissionCodes": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Role updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Role" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      },
+      "delete": {
+        "tags": ["Identity"],
+        "summary": "Delete role (non-system only)",
+        "operationId": "deleteRole",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "204": { "description": "Role deleted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "tags": ["Identity"],
+        "summary": "List users",
+        "operationId": "listUsers",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Search by email or display name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Users page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/UserSummary" }
+                    },
+                    "total": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      },
+      "post": {
+        "tags": ["Identity"],
+        "summary": "Create user",
+        "operationId": "createUser",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "displayName"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "displayName": { "type": "string", "maxLength": 255 },
+                  "userType": { "type": "string", "enum": ["staff", "portal"] },
+                  "partyId": { "type": ["string", "null"], "format": "uuid" },
+                  "jobTitle": { "type": ["string", "null"] },
+                  "phone": { "type": ["string", "null"] },
+                  "externalSubject": { "type": ["string", "null"] },
+                  "roleCodes": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  },
+                  "locationIds": {
+                    "type": "array",
+                    "items": { "type": "string", "format": "uuid" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserSummary" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/admin/users/{id}": {
+      "patch": {
+        "tags": ["Identity"],
+        "summary": "Update user",
+        "operationId": "updateUser",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "displayName": { "type": "string" },
+                  "jobTitle": { "type": ["string", "null"] },
+                  "phone": { "type": ["string", "null"] },
+                  "isActive": { "type": "boolean" },
+                  "roleCodes": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  },
+                  "locationIds": {
+                    "type": "array",
+                    "items": { "type": "string", "format": "uuid" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserSummary" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/admin/users/{id}/overrides": {
+      "put": {
+        "tags": ["Identity"],
+        "summary": "Replace permission overrides for a user",
+        "operationId": "replaceUserOverrides",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["overrides"],
+                "properties": {
+                  "overrides": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["permissionCode", "effect"],
+                      "properties": {
+                        "permissionCode": { "type": "string" },
+                        "effect": { "type": "string", "enum": ["grant", "deny"] }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Overrides replaced" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/admin/users/{id}/effective": {
+      "get": {
+        "tags": ["Identity"],
+        "summary": "Effective permissions for a user",
+        "operationId": "getUserEffective",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Effective permission set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "userId": { "type": "string", "format": "uuid" },
+                    "permissions": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/admin/access-review": {
+      "get": {
+        "tags": ["Identity"],
+        "summary": "Access review snapshot (roles, overrides, location scopes)",
+        "operationId": "accessReview",
+        "responses": {
+          "200": { "description": "Access review data" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/parties": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "List parties (customers / suppliers)",
+        "operationId": "listParties",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["customer", "supplier", "both"] }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Parties",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Party" }
+                    },
+                    "total": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Catalog"],
+        "summary": "Create party",
+        "operationId": "createParty",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PartyWrite" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Party created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Party" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/parties/{id}": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "Get party",
+        "operationId": "getParty",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Party",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Party" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Catalog"],
+        "summary": "Update party",
+        "operationId": "updateParty",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" },
+          { "$ref": "#/components/parameters/RowVersion" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PartyWrite" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Party updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Party" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/locations": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "List locations",
+        "operationId": "listLocations",
+        "responses": {
+          "200": {
+            "description": "Locations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Location" }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Catalog"],
+        "summary": "Create location",
+        "operationId": "createLocation",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["code", "name"],
+                "properties": {
+                  "code": { "type": "string", "maxLength": 32 },
+                  "name": { "type": "string", "maxLength": 255 },
+                  "isActive": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Location created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Location" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/locations/{id}": {
+      "delete": {
+        "tags": ["Catalog"],
+        "summary": "Deactivate / delete location",
+        "operationId": "deleteLocation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "204": { "description": "Location removed" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/item-categories": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "List item categories",
+        "operationId": "listItemCategories",
+        "responses": {
+          "200": {
+            "description": "Categories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "code": { "type": "string" },
+                      "name": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Catalog"],
+        "summary": "Create item category",
+        "operationId": "createItemCategory",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["code", "name"],
+                "properties": {
+                  "code": { "type": "string" },
+                  "name": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Category created" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/items": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "List items",
+        "operationId": "listItems",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "categoryId",
+            "in": "query",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Item" }
+                    },
+                    "total": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Catalog"],
+        "summary": "Create item",
+        "operationId": "createItem",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ItemWrite" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Item created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Item" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/order-types": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "List order types",
+        "operationId": "listOrderTypes",
+        "responses": {
+          "200": { "description": "Order types" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Catalog"],
+        "summary": "Create order type",
+        "operationId": "createOrderType",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["code", "name"],
+                "properties": {
+                  "code": { "type": "string" },
+                  "name": { "type": "string" },
+                  "direction": { "type": "string", "enum": ["sales", "purchase"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Order type created" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/tax/rules": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "List tax rules",
+        "operationId": "listTaxRules",
+        "responses": {
+          "200": { "description": "Tax rules" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Catalog"],
+        "summary": "Create tax rule version",
+        "operationId": "createTaxRule",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["code", "name", "rateBps", "effectiveFrom"],
+                "properties": {
+                  "code": { "type": "string" },
+                  "name": { "type": "string" },
+                  "rateBps": { "type": "integer", "description": "Rate in basis points (e.g. 1250 = 12.5%)" },
+                  "effectiveFrom": { "type": "string", "format": "date" },
+                  "effectiveTo": { "type": ["string", "null"], "format": "date" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Tax rule created" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/tax/wht": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "List WHT rules",
+        "operationId": "listWhtRules",
+        "responses": {
+          "200": { "description": "WHT rules" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/fx/rates": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "List FX rates",
+        "operationId": "listFxRates",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": { "type": "string", "format": "date" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "FX rates" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/fx/rates/{date}": {
+      "put": {
+        "tags": ["Catalog"],
+        "summary": "Upsert FX rates for a date",
+        "operationId": "upsertFxRates",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "date" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["rates"],
+                "properties": {
+                  "rates": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["currency", "rate"],
+                      "properties": {
+                        "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+                        "rate": { "type": "number" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Rates upserted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/document-templates": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "List document templates",
+        "operationId": "listDocumentTemplates",
+        "responses": {
+          "200": { "description": "Templates" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/document-templates/{type}": {
+      "get": {
+        "tags": ["Catalog"],
+        "summary": "Get document template by type",
+        "operationId": "getDocumentTemplate",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Template" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/document-templates/{type}/draft": {
+      "put": {
+        "tags": ["Catalog"],
+        "summary": "Save template draft",
+        "operationId": "saveTemplateDraft",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "body": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Draft saved" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      },
+      "delete": {
+        "tags": ["Catalog"],
+        "summary": "Discard template draft",
+        "operationId": "discardTemplateDraft",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "204": { "description": "Draft discarded" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/document-templates/{type}/publish": {
+      "post": {
+        "tags": ["Catalog"],
+        "summary": "Publish template draft",
+        "operationId": "publishTemplate",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "description": "Template published" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/accounts": {
+      "get": {
+        "tags": ["Ledger"],
+        "summary": "List chart of accounts",
+        "operationId": "listAccounts",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Accounts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Account" }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Ledger"],
+        "summary": "Create account",
+        "operationId": "createAccount",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["code", "name", "accountType"],
+                "properties": {
+                  "code": { "type": "string", "maxLength": 32 },
+                  "name": { "type": "string", "maxLength": 255 },
+                  "accountType": {
+                    "type": "string",
+                    "enum": ["asset", "liability", "equity", "revenue", "expense"]
+                  },
+                  "parentId": { "type": ["string", "null"], "format": "uuid" },
+                  "isPostable": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Account" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/accounts/{id}": {
+      "patch": {
+        "tags": ["Ledger"],
+        "summary": "Update account",
+        "operationId": "updateAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" },
+          { "$ref": "#/components/parameters/RowVersion" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "isPostable": { "type": "boolean" },
+                  "isActive": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Account updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Account" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/journals": {
+      "get": {
+        "tags": ["Ledger"],
+        "summary": "List journals",
+        "operationId": "listJournals",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["draft", "posted", "reversed"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Journals",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Journal" }
+                    },
+                    "total": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Ledger"],
+        "summary": "Create manual journal (draft)",
+        "operationId": "createJournal",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/JournalWrite" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Journal created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Journal" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/journals/{id}": {
+      "get": {
+        "tags": ["Ledger"],
+        "summary": "Get journal with lines",
+        "operationId": "getJournal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Journal",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Journal" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/journals/{id}/post": {
+      "post": {
+        "tags": ["Ledger"],
+        "summary": "Post a draft journal",
+        "operationId": "postJournal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Journal posted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Journal" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/journals/{id}/reverse": {
+      "post": {
+        "tags": ["Ledger"],
+        "summary": "Reverse a posted journal",
+        "operationId": "reverseJournal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "postingDate": { "type": "string", "format": "date" },
+                  "description": { "type": ["string", "null"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reversal journal created and posted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Journal" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/invoices": {
+      "get": {
+        "tags": ["Receivables"],
+        "summary": "List invoices",
+        "operationId": "listInvoices",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          {
+            "name": "customerId",
+            "in": "query",
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invoices",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Invoice" }
+                    },
+                    "total": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Receivables"],
+        "summary": "Post a customer invoice",
+        "operationId": "postInvoice",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InvoiceWrite" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Invoice posted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Invoice" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/invoices/{id}": {
+      "get": {
+        "tags": ["Receivables"],
+        "summary": "Get invoice",
+        "operationId": "getInvoice",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invoice",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Invoice" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/invoices/{id}/credit-notes": {
+      "post": {
+        "tags": ["Receivables"],
+        "summary": "Post credit note against invoice",
+        "operationId": "postCreditNote",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["lines"],
+                "properties": {
+                  "creditDate": { "type": "string", "format": "date" },
+                  "memo": { "type": ["string", "null"] },
+                  "lines": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": ["description", "qty", "unitPriceMinor"],
+                      "properties": {
+                        "description": { "type": "string" },
+                        "qty": { "type": "number" },
+                        "unitPriceMinor": { "type": "integer", "minimum": 0 },
+                        "itemId": { "type": ["string", "null"], "format": "uuid" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Credit note posted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/receipts": {
+      "get": {
+        "tags": ["Receivables"],
+        "summary": "List receipts",
+        "operationId": "listReceipts",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          {
+            "name": "customerId",
+            "in": "query",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Receipts" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Receivables"],
+        "summary": "Post customer receipt",
+        "operationId": "postReceipt",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["customerId", "receiptDate", "amountMinor"],
+                "properties": {
+                  "customerId": { "type": "string", "format": "uuid" },
+                  "receiptDate": { "type": "string", "format": "date" },
+                  "amountMinor": { "type": "integer", "minimum": 1 },
+                  "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+                  "bankAccountId": { "type": ["string", "null"], "format": "uuid" },
+                  "reference": { "type": ["string", "null"] },
+                  "memo": { "type": ["string", "null"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Receipt posted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/receipts/{id}/apply": {
+      "post": {
+        "tags": ["Receivables"],
+        "summary": "Apply receipt to open invoices",
+        "operationId": "applyReceipt",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["allocations"],
+                "properties": {
+                  "allocations": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": ["invoiceId", "amountMinor"],
+                      "properties": {
+                        "invoiceId": { "type": "string", "format": "uuid" },
+                        "amountMinor": { "type": "integer", "minimum": 1 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Receipt applied" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/receipts/{id}/refunds": {
+      "post": {
+        "tags": ["Receivables"],
+        "summary": "Post customer refund from receipt",
+        "operationId": "postRefund",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["amountMinor", "refundDate"],
+                "properties": {
+                  "amountMinor": { "type": "integer", "minimum": 1 },
+                  "refundDate": { "type": "string", "format": "date" },
+                  "memo": { "type": ["string", "null"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Refund posted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/bills": {
+      "get": {
+        "tags": ["Payables"],
+        "summary": "List supplier bills",
+        "operationId": "listBills",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          {
+            "name": "supplierId",
+            "in": "query",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Bills" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Payables"],
+        "summary": "Post supplier bill",
+        "operationId": "postBill",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["supplierId", "billDate", "lines"],
+                "properties": {
+                  "supplierId": { "type": "string", "format": "uuid" },
+                  "billDate": { "type": "string", "format": "date" },
+                  "dueDate": { "type": ["string", "null"], "format": "date" },
+                  "supplierRef": { "type": ["string", "null"] },
+                  "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+                  "memo": { "type": ["string", "null"] },
+                  "purchaseOrderId": { "type": ["string", "null"], "format": "uuid" },
+                  "lines": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": ["description", "qty", "unitPriceMinor"],
+                      "properties": {
+                        "description": { "type": "string" },
+                        "qty": { "type": "number" },
+                        "unitPriceMinor": { "type": "integer", "minimum": 0 },
+                        "itemId": { "type": ["string", "null"], "format": "uuid" },
+                        "accountId": { "type": ["string", "null"], "format": "uuid" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Bill posted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/supplier-payments": {
+      "get": {
+        "tags": ["Payables"],
+        "summary": "List supplier payments",
+        "operationId": "listSupplierPayments",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" }
+        ],
+        "responses": {
+          "200": { "description": "Supplier payments" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Payables"],
+        "summary": "Prepare supplier payment",
+        "operationId": "prepareSupplierPayment",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["supplierId", "paymentDate", "amountMinor"],
+                "properties": {
+                  "supplierId": { "type": "string", "format": "uuid" },
+                  "paymentDate": { "type": "string", "format": "date" },
+                  "amountMinor": { "type": "integer", "minimum": 1 },
+                  "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+                  "bankAccountId": { "type": ["string", "null"], "format": "uuid" },
+                  "reference": { "type": ["string", "null"] },
+                  "allocations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["billId", "amountMinor"],
+                      "properties": {
+                        "billId": { "type": "string", "format": "uuid" },
+                        "amountMinor": { "type": "integer", "minimum": 1 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Payment prepared (awaiting confirm)" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/supplier-payments/{id}/confirm": {
+      "post": {
+        "tags": ["Payables"],
+        "summary": "Confirm supplier payment (SoD: confirmer ≠ preparer)",
+        "operationId": "confirmSupplierPayment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "description": "Payment confirmed and posted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/supplier-payments/{id}/cancel": {
+      "post": {
+        "tags": ["Payables"],
+        "summary": "Cancel prepared supplier payment",
+        "operationId": "cancelSupplierPayment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "description": "Payment cancelled" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/stock/on-hand": {
+      "get": {
+        "tags": ["Inventory"],
+        "summary": "Stock on hand by item / location",
+        "operationId": "stockOnHand",
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "query",
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "name": "locationId",
+            "in": "query",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "On-hand quantities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "itemId": { "type": "string", "format": "uuid" },
+                      "locationId": { "type": "string", "format": "uuid" },
+                      "qtyOnHand": { "type": "number" },
+                      "qtyAvailable": { "type": "number" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/stock/assignments": {
+      "get": {
+        "tags": ["Inventory"],
+        "summary": "List stock assignments",
+        "operationId": "listStockAssignments",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Assignments" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Inventory"],
+        "summary": "Create stock assignment request",
+        "operationId": "createStockAssignment",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["itemId", "locationId", "qty"],
+                "properties": {
+                  "itemId": { "type": "string", "format": "uuid" },
+                  "locationId": { "type": "string", "format": "uuid" },
+                  "qty": { "type": "number" },
+                  "salesOrderId": { "type": ["string", "null"], "format": "uuid" },
+                  "memo": { "type": ["string", "null"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Assignment created" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/stock/assignments/{id}/decide": {
+      "post": {
+        "tags": ["Inventory"],
+        "summary": "Approve or reject assignment (SoD)",
+        "operationId": "decideStockAssignment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["decision"],
+                "properties": {
+                  "decision": { "type": "string", "enum": ["approve", "reject"] },
+                  "memo": { "type": ["string", "null"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Decision recorded" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/deliveries": {
+      "post": {
+        "tags": ["Inventory"],
+        "summary": "Post delivery (issues stock + COGS journal)",
+        "operationId": "postDelivery",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["deliveryDate", "lines"],
+                "properties": {
+                  "deliveryDate": { "type": "string", "format": "date" },
+                  "salesOrderId": { "type": ["string", "null"], "format": "uuid" },
+                  "customerId": { "type": ["string", "null"], "format": "uuid" },
+                  "memo": { "type": ["string", "null"] },
+                  "lines": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": ["itemId", "locationId", "qty"],
+                      "properties": {
+                        "itemId": { "type": "string", "format": "uuid" },
+                        "locationId": { "type": "string", "format": "uuid" },
+                        "qty": { "type": "number" },
+                        "assignmentId": { "type": ["string", "null"], "format": "uuid" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Delivery posted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/quotations": {
+      "get": {
+        "tags": ["Sales"],
+        "summary": "List quotations",
+        "operationId": "listQuotations",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" }
+        ],
+        "responses": {
+          "200": { "description": "Quotations" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Sales"],
+        "summary": "Create quotation",
+        "operationId": "createQuotation",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["customerId", "quoteDate", "lines"],
+                "properties": {
+                  "customerId": { "type": "string", "format": "uuid" },
+                  "quoteDate": { "type": "string", "format": "date" },
+                  "validUntil": { "type": ["string", "null"], "format": "date" },
+                  "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+                  "memo": { "type": ["string", "null"] },
+                  "lines": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": ["qty", "unitPriceMinor"],
+                      "properties": {
+                        "description": { "type": ["string", "null"] },
+                        "qty": { "type": "number" },
+                        "unitPriceMinor": { "type": "integer", "minimum": 0 },
+                        "itemId": { "type": ["string", "null"], "format": "uuid" },
+                        "unit": { "type": ["string", "null"] }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Quotation created" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/quotations/{id}": {
+      "get": {
+        "tags": ["Sales"],
+        "summary": "Get quotation",
+        "operationId": "getQuotation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Quotation" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/quotations/{id}/status": {
+      "post": {
+        "tags": ["Sales"],
+        "summary": "Change quotation status",
+        "operationId": "changeQuotationStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["draft", "sent", "accepted", "rejected", "expired"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Status updated" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/quotations/{id}/convert": {
+      "post": {
+        "tags": ["Sales"],
+        "summary": "Convert quotation to sales order",
+        "operationId": "convertQuotation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "201": { "description": "Sales order created from quotation" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/sales-orders": {
+      "get": {
+        "tags": ["Sales"],
+        "summary": "List sales orders",
+        "operationId": "listSalesOrders",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" }
+        ],
+        "responses": {
+          "200": { "description": "Sales orders" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Sales"],
+        "summary": "Create sales order",
+        "operationId": "createSalesOrder",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SalesOrderWrite" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Sales order created" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/sales-orders/{id}": {
+      "get": {
+        "tags": ["Sales"],
+        "summary": "Get sales order",
+        "operationId": "getSalesOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Sales order" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/sales-orders/{id}/confirm": {
+      "post": {
+        "tags": ["Sales"],
+        "summary": "Confirm sales order",
+        "operationId": "confirmSalesOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "description": "Sales order confirmed" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/purchase-orders": {
+      "get": {
+        "tags": ["Procurement"],
+        "summary": "List purchase orders",
+        "operationId": "listPurchaseOrders",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" }
+        ],
+        "responses": {
+          "200": { "description": "Purchase orders" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Procurement"],
+        "summary": "Create purchase order",
+        "operationId": "createPurchaseOrder",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["supplierId", "orderDate", "lines"],
+                "properties": {
+                  "supplierId": { "type": "string", "format": "uuid" },
+                  "orderDate": { "type": "string", "format": "date" },
+                  "requiredDate": { "type": ["string", "null"], "format": "date" },
+                  "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+                  "memo": { "type": ["string", "null"] },
+                  "lines": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": ["qty", "unitPriceMinor"],
+                      "properties": {
+                        "description": { "type": ["string", "null"] },
+                        "qty": { "type": "number" },
+                        "unitPriceMinor": { "type": "integer", "minimum": 0 },
+                        "itemId": { "type": ["string", "null"], "format": "uuid" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Purchase order created" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/purchase-orders/{id}/approve": {
+      "post": {
+        "tags": ["Procurement"],
+        "summary": "Approve purchase order (SoD)",
+        "operationId": "approvePurchaseOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "description": "PO approved" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/goods-receipts": {
+      "post": {
+        "tags": ["Procurement"],
+        "summary": "Post goods receipt note (inventory + GRNI journal)",
+        "operationId": "postGoodsReceipt",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["purchaseOrderId", "receiptDate", "lines"],
+                "properties": {
+                  "purchaseOrderId": { "type": "string", "format": "uuid" },
+                  "receiptDate": { "type": "string", "format": "date" },
+                  "locationId": { "type": "string", "format": "uuid" },
+                  "memo": { "type": ["string", "null"] },
+                  "lines": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": ["purchaseOrderLineId", "qty"],
+                      "properties": {
+                        "purchaseOrderLineId": { "type": "string", "format": "uuid" },
+                        "qty": { "type": "number" },
+                        "itemId": { "type": ["string", "null"], "format": "uuid" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "GRN posted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/goods-receipts/pending-qc": {
+      "get": {
+        "tags": ["Procurement"],
+        "summary": "List goods receipts pending QC",
+        "operationId": "listPendingQc",
+        "responses": {
+          "200": { "description": "Pending QC list" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/qc/{id}": {
+      "post": {
+        "tags": ["Procurement"],
+        "summary": "Record QC result for goods receipt",
+        "operationId": "recordQc",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["result"],
+                "properties": {
+                  "result": { "type": "string", "enum": ["pass", "fail", "partial"] },
+                  "memo": { "type": ["string", "null"] },
+                  "lines": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "goodsReceiptLineId": { "type": "string", "format": "uuid" },
+                        "acceptedQty": { "type": "number" },
+                        "rejectedQty": { "type": "number" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "QC recorded" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/employees": {
+      "get": {
+        "tags": ["Payroll"],
+        "summary": "List employees",
+        "operationId": "listEmployees",
+        "responses": {
+          "200": { "description": "Employees" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Payroll"],
+        "summary": "Create employee",
+        "operationId": "createEmployee",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["displayName", "hireDate"],
+                "properties": {
+                  "displayName": { "type": "string" },
+                  "employeeNumber": { "type": ["string", "null"] },
+                  "hireDate": { "type": "string", "format": "date" },
+                  "jobTitle": { "type": ["string", "null"] },
+                  "basicSalaryMinor": { "type": ["integer", "null"], "minimum": 0 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Employee created" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/payroll/runs": {
+      "get": {
+        "tags": ["Payroll"],
+        "summary": "List payroll runs",
+        "operationId": "listPayrollRuns",
+        "responses": {
+          "200": { "description": "Payroll runs" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Payroll"],
+        "summary": "Create payroll run",
+        "operationId": "createPayrollRun",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["periodYear", "periodMonth"],
+                "properties": {
+                  "periodYear": { "type": "integer" },
+                  "periodMonth": { "type": "integer", "minimum": 1, "maximum": 12 },
+                  "memo": { "type": ["string", "null"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Payroll run created" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/payroll/runs/{id}": {
+      "get": {
+        "tags": ["Payroll"],
+        "summary": "Get payroll run",
+        "operationId": "getPayrollRun",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Payroll run" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/payroll/runs/{id}/approve": {
+      "post": {
+        "tags": ["Payroll"],
+        "summary": "Approve payroll run",
+        "operationId": "approvePayrollRun",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "description": "Payroll run approved" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/payroll/runs/{id}/post": {
+      "post": {
+        "tags": ["Payroll"],
+        "summary": "Post payroll run (journals)",
+        "operationId": "postPayrollRun",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "description": "Payroll run posted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/payroll/runs/{id}/pay": {
+      "post": {
+        "tags": ["Payroll"],
+        "summary": "Mark payroll run as paid",
+        "operationId": "payPayrollRun",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "description": "Payroll run paid" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/assets": {
+      "get": {
+        "tags": ["Assets"],
+        "summary": "List fixed assets",
+        "operationId": "listAssets",
+        "responses": {
+          "200": { "description": "Assets" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Assets"],
+        "summary": "Capitalise fixed asset",
+        "operationId": "capitaliseAsset",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "acquisitionDate", "costMinor", "assetClassId"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "assetClassId": { "type": "string", "format": "uuid" },
+                  "acquisitionDate": { "type": "string", "format": "date" },
+                  "costMinor": { "type": "integer", "minimum": 1 },
+                  "residualValueMinor": { "type": "integer", "minimum": 0 },
+                  "usefulLifeMonths": { "type": "integer", "minimum": 1 },
+                  "locationId": { "type": ["string", "null"], "format": "uuid" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Asset capitalised" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/asset-classes": {
+      "get": {
+        "tags": ["Assets"],
+        "summary": "List asset classes",
+        "operationId": "listAssetClasses",
+        "responses": {
+          "200": { "description": "Asset classes" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/assets/depreciation/{month}": {
+      "post": {
+        "tags": ["Assets"],
+        "summary": "Post depreciation run for a month (YYYY-MM)",
+        "operationId": "postDepreciation",
+        "parameters": [
+          {
+            "name": "month",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "pattern": "^\\d{4}-\\d{2}$" },
+            "description": "Period month in YYYY-MM"
+          },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "description": "Depreciation posted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/expenses": {
+      "get": {
+        "tags": ["Treasury"],
+        "summary": "List cash expenses",
+        "operationId": "listExpenses",
+        "responses": {
+          "200": { "description": "Expenses" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Treasury"],
+        "summary": "Post cash expense",
+        "operationId": "postCashExpense",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["expenseDate", "amountMinor", "accountId"],
+                "properties": {
+                  "expenseDate": { "type": "string", "format": "date" },
+                  "amountMinor": { "type": "integer", "minimum": 1 },
+                  "accountId": { "type": "string", "format": "uuid" },
+                  "bankAccountId": { "type": ["string", "null"], "format": "uuid" },
+                  "memo": { "type": ["string", "null"] },
+                  "partyId": { "type": ["string", "null"], "format": "uuid" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Expense posted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/transfers": {
+      "post": {
+        "tags": ["Treasury"],
+        "summary": "Post cash transfer between bank accounts",
+        "operationId": "postCashTransfer",
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["transferDate", "amountMinor", "fromAccountId", "toAccountId"],
+                "properties": {
+                  "transferDate": { "type": "string", "format": "date" },
+                  "amountMinor": { "type": "integer", "minimum": 1 },
+                  "fromAccountId": { "type": "string", "format": "uuid" },
+                  "toAccountId": { "type": "string", "format": "uuid" },
+                  "memo": { "type": ["string", "null"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Transfer posted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "CloudflareAccess": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Cf-Access-Jwt-Assertion",
+        "description": "Cloudflare Access JWT (production)"
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Entra ID / OIDC bearer token (production)"
+      },
+      "DevUser": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-dev-user",
+        "description": "Development only: email of the user to impersonate"
+      }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 8
+        },
+        "description": "Client-generated unique key for this command. Prefer a UUID created when the form opens. Same key + same body replays the original response with `Idempotent-Replay: true`. Same key + different body returns 409 idempotency_mismatch."
+      },
+      "RowVersion": {
+        "name": "If-Match",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Optional optimistic concurrency token (rowVersion). Mismatch returns 409 stale_revision."
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 50
+        }
+      },
+      "Offset": {
+        "name": "offset",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Missing or invalid authentication",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Authenticated but not permitted (permission, SoD, or portal isolation)",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found in this company",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Business conflict (period locked, stale revision, SoD, insufficient stock, unbalanced journal, idempotency mismatch, etc.)",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "Request validation failed",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": ["error", "message", "requestId"],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Machine-readable code (e.g. period_locked, validation_failed, stale_revision, sod_violation, insufficient_stock)"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable explanation"
+          },
+          "fields": {
+            "type": ["object", "null"],
+            "additionalProperties": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "description": "Field-level validation messages when applicable"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Correlation id for this request"
+          }
+        }
+      },
+      "MoneyMinor": {
+        "type": "integer",
+        "description": "Amount in minor units (pesewas). GHS 1,234.56 = 123456."
+      },
+      "Me": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "email": { "type": "string", "format": "email" },
+          "displayName": { "type": "string" },
+          "userType": { "type": "string", "enum": ["staff", "portal"] },
+          "companyId": { "type": "string", "format": "uuid" },
+          "permissions": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "roles": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "locationIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          }
+        }
+      },
+      "Role": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": ["string", "null"] },
+          "isSystem": { "type": "boolean" },
+          "permissionCodes": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "UserSummary": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "email": { "type": "string", "format": "email" },
+          "displayName": { "type": "string" },
+          "userType": { "type": "string" },
+          "isActive": { "type": "boolean" },
+          "roleCodes": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "Party": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "partyType": { "type": "string", "enum": ["customer", "supplier", "both"] },
+          "email": { "type": ["string", "null"] },
+          "phone": { "type": ["string", "null"] },
+          "taxId": { "type": ["string", "null"] },
+          "isActive": { "type": "boolean" },
+          "rowVersion": { "type": "integer" }
+        }
+      },
+      "PartyWrite": {
+        "type": "object",
+        "required": ["name", "partyType"],
+        "properties": {
+          "code": { "type": ["string", "null"] },
+          "name": { "type": "string" },
+          "partyType": { "type": "string", "enum": ["customer", "supplier", "both"] },
+          "email": { "type": ["string", "null"] },
+          "phone": { "type": ["string", "null"] },
+          "taxId": { "type": ["string", "null"] },
+          "isActive": { "type": "boolean" }
+        }
+      },
+      "Location": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "isActive": { "type": "boolean" }
+        }
+      },
+      "Item": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "sku": { "type": "string" },
+          "name": { "type": "string" },
+          "categoryId": { "type": ["string", "null"], "format": "uuid" },
+          "unit": { "type": "string" },
+          "isActive": { "type": "boolean" },
+          "trackStock": { "type": "boolean" }
+        }
+      },
+      "ItemWrite": {
+        "type": "object",
+        "required": ["sku", "name"],
+        "properties": {
+          "sku": { "type": "string" },
+          "name": { "type": "string" },
+          "categoryId": { "type": ["string", "null"], "format": "uuid" },
+          "unit": { "type": "string" },
+          "trackStock": { "type": "boolean" },
+          "isActive": { "type": "boolean" }
+        }
+      },
+      "Account": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "accountType": { "type": "string" },
+          "isPostable": { "type": "boolean" },
+          "isActive": { "type": "boolean" },
+          "balanceMinor": { "type": "integer" },
+          "rowVersion": { "type": "integer" }
+        }
+      },
+      "Journal": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "journalNumber": { "type": "string" },
+          "postingDate": { "type": "string", "format": "date" },
+          "status": { "type": "string", "enum": ["draft", "posted", "reversed"] },
+          "description": { "type": ["string", "null"] },
+          "currency": { "type": "string" },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string", "format": "uuid" },
+                "accountId": { "type": "string", "format": "uuid" },
+                "debitMinor": { "type": "integer" },
+                "creditMinor": { "type": "integer" },
+                "partyId": { "type": ["string", "null"], "format": "uuid" },
+                "memo": { "type": ["string", "null"] }
+              }
+            }
+          }
+        }
+      },
+      "JournalWrite": {
+        "type": "object",
+        "required": ["postingDate", "lines"],
+        "properties": {
+          "postingDate": { "type": "string", "format": "date" },
+          "description": { "type": ["string", "null"] },
+          "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+          "lines": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "required": ["accountId"],
+              "properties": {
+                "accountId": { "type": "string", "format": "uuid" },
+                "debitMinor": { "type": "integer", "minimum": 0 },
+                "creditMinor": { "type": "integer", "minimum": 0 },
+                "partyId": { "type": ["string", "null"], "format": "uuid" },
+                "memo": { "type": ["string", "null"] },
+                "dimension1": { "type": ["string", "null"] },
+                "dimension2": { "type": ["string", "null"] }
+              }
+            }
+          }
+        }
+      },
+      "Invoice": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "invoiceNumber": { "type": "string" },
+          "customerId": { "type": "string", "format": "uuid" },
+          "invoiceDate": { "type": "string", "format": "date" },
+          "dueDate": { "type": ["string", "null"], "format": "date" },
+          "currency": { "type": "string" },
+          "status": { "type": "string" },
+          "totalMinor": { "type": "integer" },
+          "openMinor": { "type": "integer" },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string", "format": "uuid" },
+                "description": { "type": "string" },
+                "qty": { "type": "number" },
+                "unitPriceMinor": { "type": "integer" },
+                "lineTotalMinor": { "type": "integer" },
+                "itemId": { "type": ["string", "null"], "format": "uuid" }
+              }
+            }
+          }
+        }
+      },
+      "InvoiceWrite": {
+        "type": "object",
+        "required": ["customerId", "invoiceDate", "lines"],
+        "properties": {
+          "customerId": { "type": "string", "format": "uuid" },
+          "invoiceDate": { "type": "string", "format": "date" },
+          "dueDate": { "type": ["string", "null"], "format": "date" },
+          "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+          "memo": { "type": ["string", "null"] },
+          "salesOrderId": { "type": ["string", "null"], "format": "uuid" },
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["description", "qty", "unitPriceMinor"],
+              "properties": {
+                "description": { "type": "string", "maxLength": 512 },
+                "qty": { "type": "number" },
+                "unitPriceMinor": { "type": "integer", "minimum": 0 },
+                "itemId": { "type": ["string", "null"], "format": "uuid" },
+                "unit": { "type": ["string", "null"] }
+              }
+            }
+          }
+        }
+      },
+      "SalesOrderWrite": {
+        "type": "object",
+        "required": ["customerId", "orderDate", "lines"],
+        "properties": {
+          "customerId": { "type": "string", "format": "uuid" },
+          "orderDate": { "type": "string", "format": "date" },
+          "requiredDate": { "type": ["string", "null"], "format": "date" },
+          "customerPoRef": { "type": ["string", "null"] },
+          "orderTypeId": { "type": ["string", "null"], "format": "uuid" },
+          "quotationId": { "type": ["string", "null"], "format": "uuid" },
+          "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+          "memo": { "type": ["string", "null"] },
+          "deliverTo": { "type": ["string", "null"] },
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["qty", "unitPriceMinor"],
+              "properties": {
+                "description": { "type": ["string", "null"] },
+                "qty": { "type": "number" },
+                "unitPriceMinor": { "type": "integer", "minimum": 0 },
+                "itemId": { "type": ["string", "null"], "format": "uuid" },
+                "unit": { "type": ["string", "null"] }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    { "CloudflareAccess": [] },
+    { "BearerAuth": [] },
+    { "DevUser": [] }
+  ]
+}

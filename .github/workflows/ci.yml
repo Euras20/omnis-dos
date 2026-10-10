@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  openapi:
+    name: OpenAPI contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate openapi.json exists and is valid JSON
+        run: |
+          test -f docs/openapi.json
+          python3 -c "import json; json.load(open('docs/openapi.json'))"
+          echo "docs/openapi.json is valid JSON"
+
+      - name: Check OpenAPI version and required keys
+        run: |
+          python3 << 'PY'
+          import json, sys
+          doc = json.load(open("docs/openapi.json"))
+          assert doc.get("openapi", "").startswith("3.1"), "Expected OpenAPI 3.1"
+          assert "info" in doc and "paths" in doc and "components" in doc
+          assert "/health/live" in doc["paths"]
+          assert "/me" in doc["paths"]
+          assert "/invoices" in doc["paths"]
+          assert "Error" in doc["components"]["schemas"]
+          print(f"OpenAPI {doc['openapi']} — {len(doc['paths'])} paths OK")
+          PY
+
+  lint:
+    name: Pint (style)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          tools: composer:v2
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run Laravel Pint
+        run: vendor/bin/pint --test
+
+  test:
+    name: PHPUnit
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: omnis_test
+          POSTGRES_USER: omnis
+          POSTGRES_PASSWORD: omnis
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo_pgsql, pgsql
+          tools: composer:v2
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          # Override DB for CI
+          sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=omnis/' .env || true
+          echo "DB_PASSWORD=omnis" >> .env
+          echo "OMNIS_AUTH_DRIVER=dev" >> .env
+
+      - name: Run migrations
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: omnis_test
+          DB_USERNAME: omnis
+          DB_PASSWORD: omnis
+        run: php artisan migrate --force
+
+      - name: Run Unit + Feature tests
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: omnis_test
+          DB_USERNAME: omnis
+          DB_PASSWORD: omnis
+          APP_ENV: testing
+          OMNIS_AUTH_DRIVER: dev
+        run: vendor/bin/phpunit --testsuite Unit,Feature --colors=always
+
+      - name: Run Integration tests
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: omnis_test
+          DB_USERNAME: omnis
+          DB_PASSWORD: omnis
+          APP_ENV: testing
+          OMNIS_AUTH_DRIVER: dev
+        run: vendor/bin/phpunit --testsuite Integration --colors=always
