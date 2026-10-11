@@ -218,7 +218,7 @@ final class PostReceipt
             $journalId = $this->postingService->post(new PostingRequest(
                 companyId: $companyId,
                 postingDate: $receiptDate,
-                postingKey: new PostingKey("receipt:{$receiptId}:post"),
+                postingKey: PostingKey::make('receipt', $receiptId, 'post'),
                 sourceType: 'receipt',
                 sourceId: $receiptId,
                 eventType: 'post',
