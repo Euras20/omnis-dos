@@ -120,7 +120,7 @@ final class ConfirmSupplierPayment
             $journalId = $this->postingService->post(new PostingRequest(
                 companyId: $companyId,
                 postingDate: $paymentDate,
-                postingKey: new PostingKey("supplier_payment:{$paymentId}:confirm"),
+                postingKey: PostingKey::make('supplier_payment', $paymentId, 'confirm'),
                 sourceType: 'payment',
                 sourceId: $paymentId,
                 eventType: 'confirm',
