@@ -144,7 +144,7 @@ final class ApplyReceipt
             $this->postingService->post(new PostingRequest(
                 companyId: $companyId,
                 postingDate: $applyDate,
-                postingKey: new PostingKey("receipt:{$receiptId}:apply:{$applyKey}"),
+                postingKey: PostingKey::raw("receipt:{$receiptId}:apply:{$applyKey}"),
                 sourceType: 'receipt',
                 sourceId: $receiptId,
                 eventType: 'apply',
