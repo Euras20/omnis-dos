@@ -32,7 +32,7 @@ final class ChangeQuotationStatus
     public function execute(string $id, array $data): array
     {
         $actorId = $this->companyContext->userId();
-        $this->permissionChecker->assertCan($actorId, 'sales.quote');
+        $this->permissionChecker->assertCan($actorId, 'sales.quotes.manage');
 
         $companyId = $this->companyContext->companyId();
         $newStatus = strtolower((string) ($data['status'] ?? ''));
