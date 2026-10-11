@@ -169,7 +169,7 @@ final class PostBill
             $journalId = $this->postingService->post(new PostingRequest(
                 companyId: $companyId,
                 postingDate: $billDate,
-                postingKey: new PostingKey("bill:{$billId}:post"),
+                postingKey: PostingKey::make('bill', $billId, 'post'),
                 sourceType: 'bill',
                 sourceId: $billId,
                 eventType: 'post',
