@@ -65,6 +65,8 @@ final class PostingService
         $journalId = Uuid::v7();
         $journalNo = $this->nextJournalNumber($request->companyId, $request->postingDate);
 
+        // Insert as draft first so journal_line_immutable allows line inserts,
+        // then flip to posted (balanced check is DEFERRABLE at commit).
         $journal = new Journal;
         $journal->id = $journalId;
         $journal->company_id = $request->companyId;
@@ -75,10 +77,10 @@ final class PostingService
         $journal->source_id = $request->sourceId;
         $journal->event_type = $request->eventType;
         $journal->posting_key = $postingKey;
-        $journal->status = JournalStatus::POSTED;
+        $journal->status = JournalStatus::DRAFT;
         $journal->prepared_by = $request->preparedBy ?? $request->actorId;
-        $journal->posted_by = $request->actorId;
-        $journal->posted_at = now();
+        $journal->posted_by = null;
+        $journal->posted_at = null;
         $journal->currency = $request->currency;
         $journal->request_id = $request->requestId;
         $journal->save();
@@ -99,6 +101,11 @@ final class PostingService
             $row->dimension2 = $line->dimension2;
             $row->save();
         }
+
+        $journal->status = JournalStatus::POSTED;
+        $journal->posted_by = $request->actorId;
+        $journal->posted_at = now();
+        $journal->save();
 
         $this->auditWriter->write(
             action: 'journal.posted',
