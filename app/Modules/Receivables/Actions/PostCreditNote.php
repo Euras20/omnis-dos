@@ -210,7 +210,7 @@ final class PostCreditNote
             $journalId = $this->postingService->post(new PostingRequest(
                 companyId: $companyId,
                 postingDate: $creditDate,
-                postingKey: new PostingKey("credit_note:{$creditId}:post"),
+                postingKey: PostingKey::make('credit_note', $creditId, 'post'),
                 sourceType: 'credit_note',
                 sourceId: $creditId,
                 eventType: 'post',
