@@ -118,7 +118,7 @@ final class PostRefund
             $journalId = $this->postingService->post(new PostingRequest(
                 companyId: $companyId,
                 postingDate: $refundDate,
-                postingKey: new PostingKey("refund:{$refundId}:post"),
+                postingKey: PostingKey::make('refund', $refundId, 'post'),
                 sourceType: 'refund',
                 sourceId: $refundId,
                 eventType: 'post',
