@@ -223,7 +223,7 @@ final class PostInvoice
             $journalId = $this->postingService->post(new PostingRequest(
                 companyId: $companyId,
                 postingDate: $invoiceDate,
-                postingKey: new PostingKey("invoice:{$invoiceId}:post"),
+                postingKey: PostingKey::make('invoice', $invoiceId, 'post'),
                 sourceType: 'invoice',
                 sourceId: $invoiceId,
                 eventType: 'post',
