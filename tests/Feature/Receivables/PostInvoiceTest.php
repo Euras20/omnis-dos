@@ -29,8 +29,9 @@ final class PostInvoiceTest extends TestCase
 
         $customer = Party::factory()->forCompany($this->testCompany)->customer()->create();
 
-        // Ensure expected AR / revenue accounts exist for AccountResolver conventions
-        Account::factory()->forCompany($this->testCompany)->withCode('1200')->create([
+        // Ensure expected AR / revenue / tax accounts exist for AccountResolver conventions
+        // Codes must match App\Modules\Receivables\Services\AccountResolver::CODES
+        Account::factory()->forCompany($this->testCompany)->withCode('1100')->create([
             'name' => 'Accounts Receivable',
             'category' => 'asset',
             'normal_balance' => 'debit',
@@ -40,8 +41,23 @@ final class PostInvoiceTest extends TestCase
             'category' => 'income',
             'normal_balance' => 'credit',
         ]);
-        Account::factory()->forCompany($this->testCompany)->withCode('2100')->create([
+        Account::factory()->forCompany($this->testCompany)->withCode('2200')->create([
             'name' => 'VAT Payable',
+            'category' => 'liability',
+            'normal_balance' => 'credit',
+        ]);
+        Account::factory()->forCompany($this->testCompany)->withCode('2210')->create([
+            'name' => 'NHIL Payable',
+            'category' => 'liability',
+            'normal_balance' => 'credit',
+        ]);
+        Account::factory()->forCompany($this->testCompany)->withCode('2220')->create([
+            'name' => 'GETFund Payable',
+            'category' => 'liability',
+            'normal_balance' => 'credit',
+        ]);
+        Account::factory()->forCompany($this->testCompany)->withCode('2230')->create([
+            'name' => 'COVID Levy Payable',
             'category' => 'liability',
             'normal_balance' => 'credit',
         ]);
@@ -109,8 +125,12 @@ final class PostInvoiceTest extends TestCase
         $user = $this->seedCompanyAndUser(['ar.invoice.post']);
 
         $customer = Party::factory()->forCompany($this->testCompany)->customer()->create();
-        Account::factory()->forCompany($this->testCompany)->withCode('1200')->create();
+        Account::factory()->forCompany($this->testCompany)->withCode('1100')->create();
         Account::factory()->forCompany($this->testCompany)->withCode('4000')->create();
+        Account::factory()->forCompany($this->testCompany)->withCode('2200')->create();
+        Account::factory()->forCompany($this->testCompany)->withCode('2210')->create();
+        Account::factory()->forCompany($this->testCompany)->withCode('2220')->create();
+        Account::factory()->forCompany($this->testCompany)->withCode('2230')->create();
 
         $payload = [
             'customerId' => $customer->id,
