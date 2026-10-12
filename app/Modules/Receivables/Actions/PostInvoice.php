@@ -303,7 +303,7 @@ final class PostInvoice
 
     private function nextNumber(string $companyId, string $date, string $docType): string
     {
-        $year = substr($date, 0, 4);
+        $year = (int) substr($date, 0, 4);
         $seq = NumberSequence::query()
             ->where('company_id', $companyId)
             ->where('doc_type', $docType)
@@ -319,16 +319,23 @@ final class PostInvoice
             $seq->fiscal_year = $year;
             $seq->next_value = 1;
             $seq->prefix = strtoupper(substr($docType, 0, 3));
+            $seq->pad_length = 5;
             $seq->save();
+            // Re-select with lock so concurrent creators cannot race past us.
+            $seq = NumberSequence::query()
+                ->where('id', $seq->id)
+                ->lockForUpdate()
+                ->first();
         }
 
-        $value = $seq->next_value;
+        $value = (int) $seq->next_value;
         $seq->next_value = $value + 1;
         $seq->save();
 
         $prefix = $seq->prefix ?: strtoupper(substr($docType, 0, 3));
+        $pad = max(1, (int) ($seq->pad_length ?? 5));
 
-        return sprintf('%s-%s-%05d', $prefix, $year, $value);
+        return sprintf('%s-%d-%s', $prefix, $year, str_pad((string) $value, $pad, '0', STR_PAD_LEFT));
     }
 
     /**
