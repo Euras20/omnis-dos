@@ -57,21 +57,29 @@ final class GetSalesOrderQuery
             'memo' => $order->memo,
             'deliverTo' => $order->deliver_to,
             'confirmedAt' => $order->confirmed_at?->toIso8601String(),
-            'lines' => $order->lines->map(static fn (SalesOrderLine $l) => [
-                'id' => $l->id,
-                'lineNo' => $l->line_no,
-                'itemId' => $l->item_id,
-                'description' => $l->description,
-                'qty' => (string) $l->qty,
-                'unit' => $l->unit,
-                'unitPriceMinor' => $l->unit_price_minor,
-                'netMinor' => $l->net_minor,
-                'taxMinor' => $l->tax_minor,
-                'grossMinor' => $l->gross_minor,
-                'qtyDelivered' => (string) $l->qty_delivered,
-                'qtyInvoiced' => (string) $l->qty_invoiced,
-                'qtyOpen' => (string) max(0, (float) $l->qty - (float) $l->qty_delivered),
-            ])->all(),
+            'lines' => $order->lines->map(static function (SalesOrderLine $l) {
+                $qty = (float) $l->qty;
+                $delivered = (float) $l->qty_delivered;
+                $invoiced = (float) $l->qty_invoiced;
+
+                return [
+                    'id' => $l->id,
+                    'lineNo' => $l->line_no,
+                    'itemId' => $l->item_id,
+                    'description' => $l->description,
+                    'qty' => (string) $l->qty,
+                    'unit' => $l->unit,
+                    'unitPriceMinor' => $l->unit_price_minor,
+                    'netMinor' => $l->net_minor,
+                    'taxMinor' => $l->tax_minor,
+                    'grossMinor' => $l->gross_minor,
+                    'qtyDelivered' => (string) $l->qty_delivered,
+                    'qtyInvoiced' => (string) $l->qty_invoiced,
+                    // Remaining to deliver / remaining to invoice (independent).
+                    'qtyOpen' => (string) max(0, $qty - $delivered),
+                    'qtyRemainingToInvoice' => (string) max(0, $qty - $invoiced),
+                ];
+            })->all(),
             'createdAt' => $order->created_at?->toIso8601String(),
         ];
     }
