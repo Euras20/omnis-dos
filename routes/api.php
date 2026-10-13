@@ -23,6 +23,8 @@ use App\Http\Controllers\Payables\BillController;
 use App\Http\Controllers\Payables\SupplierPaymentController;
 use App\Http\Controllers\Procurement\GoodsReceiptController;
 use App\Http\Controllers\Procurement\PurchaseOrderController;
+use App\Http\Controllers\Procurement\RequisitionController;
+use App\Http\Controllers\Procurement\RfqController;
 use App\Http\Controllers\Receivables\InvoiceController;
 use App\Http\Controllers\Receivables\ReceiptController;
 use App\Http\Controllers\Sales\QuotationController;
@@ -32,6 +34,7 @@ use App\Http\Controllers\Payroll\PayrollRunController;
 use App\Http\Controllers\Assets\AssetController;
 use App\Http\Controllers\Treasury\ExpenseController;
 use App\Http\Controllers\Treasury\TransferController;
+use App\Http\Controllers\Platform\DocumentController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -87,6 +90,7 @@ Route::prefix('v1')->group(function () {
 
         // --- Catalog: queries ---
         Route::get('/parties', [PartyController::class, 'index']);
+        Route::get('/parties/{id}/statement', [PartyController::class, 'statement']);
         Route::get('/parties/{id}', [PartyController::class, 'show']);
         Route::get('/locations', [LocationController::class, 'index']);
         Route::get('/item-categories', [ItemCategoryController::class, 'index']);
@@ -105,6 +109,7 @@ Route::prefix('v1')->group(function () {
 
         // --- Payables: queries ---
         Route::get('/bills', [BillController::class, 'index']);
+        Route::get('/bills/{id}', [BillController::class, 'show']);
         Route::get('/supplier-payments', [SupplierPaymentController::class, 'index']);
 
         // --- Inventory / Stock: queries ---
@@ -126,7 +131,16 @@ Route::prefix('v1')->group(function () {
 
         // --- Procurement: queries ---
         Route::get('/purchase-orders', [PurchaseOrderController::class, 'index']);
+        Route::get('/purchase-orders/{id}', [PurchaseOrderController::class, 'show']);
+        Route::get('/purchase-orders/{id}/pdf', [PurchaseOrderController::class, 'pdf']);
+        Route::get('/goods-receipts', [GoodsReceiptController::class, 'index']);
         Route::get('/goods-receipts/pending-qc', [GoodsReceiptController::class, 'pendingQc']);
+        Route::get('/goods-receipts/{id}', [GoodsReceiptController::class, 'show']);
+        Route::get('/requisitions', [RequisitionController::class, 'index']);
+        Route::get('/rfqs', [RfqController::class, 'index']);
+
+        // --- Documents ---
+        Route::get('/documents/purchase-orders/{id}', [DocumentController::class, 'purchaseOrder']);
 
         // --- Payroll: queries ---
         Route::get('/employees', [EmployeeController::class, 'index']);
@@ -185,6 +199,7 @@ Route::prefix('v1')->group(function () {
 
             // --- Payables: commands ---
             Route::post('/bills', [BillController::class, 'store']);
+            Route::post('/bills/{id}/resolve', [BillController::class, 'resolve']);
             Route::post('/supplier-payments', [SupplierPaymentController::class, 'store']);
             Route::post('/supplier-payments/{id}/confirm', [SupplierPaymentController::class, 'confirm']);
             Route::post('/supplier-payments/{id}/cancel', [SupplierPaymentController::class, 'cancel']);
@@ -208,8 +223,17 @@ Route::prefix('v1')->group(function () {
             // --- Procurement: commands ---
             Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);
             Route::post('/purchase-orders/{id}/approve', [PurchaseOrderController::class, 'approve']);
+            Route::post('/purchase-orders/{id}/cancel', [PurchaseOrderController::class, 'cancel']);
+            Route::post('/purchase-orders/{id}/close', [PurchaseOrderController::class, 'close']);
             Route::post('/goods-receipts', [GoodsReceiptController::class, 'store']);
             Route::post('/qc/{id}', [GoodsReceiptController::class, 'qc']);
+            Route::post('/requisitions', [RequisitionController::class, 'store']);
+            Route::post('/requisitions/{id}/approve', [RequisitionController::class, 'approve']);
+            Route::post('/requisitions/{id}/reject', [RequisitionController::class, 'reject']);
+            Route::post('/requisitions/{id}/convert', [RequisitionController::class, 'convert']);
+            Route::post('/rfqs', [RfqController::class, 'store']);
+            Route::post('/rfqs/{id}/bids', [RfqController::class, 'storeBid']);
+            Route::post('/rfqs/{id}/award', [RfqController::class, 'award']);
 
             // --- Payroll: commands ---
             Route::post('/employees', [EmployeeController::class, 'store']);
