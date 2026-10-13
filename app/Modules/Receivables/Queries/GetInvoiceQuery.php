@@ -67,6 +67,7 @@ final class GetInvoiceQuery
                 'id' => $l->id,
                 'lineNo' => $l->line_no,
                 'itemId' => $l->item_id,
+                'salesOrderLineId' => $l->sales_order_line_id,
                 'description' => $l->description,
                 'qty' => (float) $l->qty,
                 'unit' => $l->unit,
