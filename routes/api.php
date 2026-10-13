@@ -110,6 +110,13 @@ Route::prefix('v1')->group(function () {
         // --- Inventory / Stock: queries ---
         Route::get('/stock/on-hand', [StockController::class, 'onHand']);
         Route::get('/stock/assignments', [StockController::class, 'assignments']);
+        Route::get('/stock/movements', [StockController::class, 'movements']);
+        Route::get('/stock/ledger', [StockController::class, 'ledger']);
+        Route::get('/stock/traceability/{lot}', [StockController::class, 'traceability']);
+        Route::get('/stock/transfers', [StockController::class, 'transfers']);
+        Route::get('/stock/counts', [StockController::class, 'counts']);
+        Route::get('/stock/counts/{id}', [StockController::class, 'showCount']);
+        Route::get('/tracking', [StockController::class, 'tracking']);
 
         // --- Sales: queries ---
         Route::get('/quotations', [QuotationController::class, 'index']);
@@ -185,6 +192,10 @@ Route::prefix('v1')->group(function () {
             // --- Inventory / Stock: commands ---
             Route::post('/stock/assignments', [StockController::class, 'storeAssignment']);
             Route::post('/stock/assignments/{id}/decide', [StockController::class, 'decideAssignment']);
+            Route::post('/stock/transfers', [StockController::class, 'storeTransfer']);
+            Route::post('/stock/counts', [StockController::class, 'storeCount']);
+            Route::post('/stock/counts/{id}/submit', [StockController::class, 'submitCount']);
+            Route::post('/stock/counts/{id}/approve', [StockController::class, 'approveCount']);
             Route::post('/deliveries', [DeliveryController::class, 'store']);
 
             // --- Sales: commands ---
