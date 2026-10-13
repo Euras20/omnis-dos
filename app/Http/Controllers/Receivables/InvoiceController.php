@@ -26,6 +26,7 @@ final class InvoiceController
     {
         return response()->json($this->listInvoicesQuery->execute([
             'customerId' => $request->query('customerId'),
+            'salesOrderId' => $request->query('salesOrderId'),
             'status' => $request->query('status'),
             'from' => $request->query('from'),
             'to' => $request->query('to'),
