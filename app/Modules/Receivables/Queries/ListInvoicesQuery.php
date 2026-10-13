@@ -41,6 +41,9 @@ final class ListInvoicesQuery
         if (! empty($filters['status'])) {
             $q->where('status', $filters['status']);
         }
+        if (! empty($filters['salesOrderId'])) {
+            $q->where('sales_order_id', $filters['salesOrderId']);
+        }
         if (! empty($filters['from'])) {
             $q->where('invoice_date', '>=', $filters['from']);
         }
@@ -70,6 +73,7 @@ final class ListInvoicesQuery
                 'invoiceNo' => $inv->invoice_no,
                 'customerId' => $inv->customer_id,
                 'customerName' => $inv->customer?->name,
+                'salesOrderId' => $inv->sales_order_id,
                 'invoiceDate' => $inv->invoice_date?->format('Y-m-d'),
                 'dueDate' => $inv->due_date?->format('Y-m-d'),
                 'currency' => $inv->currency,
