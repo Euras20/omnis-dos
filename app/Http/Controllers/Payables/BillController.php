@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Payables;
 
 use App\Http\Requests\Payables\StoreBillRequest;
 use App\Modules\Payables\Actions\PostBill;
+use App\Modules\Payables\Actions\ResolveBill;
 use App\Modules\Payables\Queries\GetBillQuery;
 use App\Modules\Payables\Queries\ListBillsQuery;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +18,7 @@ final class BillController
         private readonly ListBillsQuery $listBillsQuery,
         private readonly GetBillQuery $getBillQuery,
         private readonly PostBill $postBill,
+        private readonly ResolveBill $resolveBill,
     ) {
     }
 
@@ -45,5 +47,10 @@ final class BillController
         $bill = $this->postBill->execute($request->validated());
 
         return response()->json($bill, 201);
+    }
+
+    public function resolve(string $id, Request $request): JsonResponse
+    {
+        return response()->json($this->resolveBill->execute($id, $request->all()));
     }
 }
