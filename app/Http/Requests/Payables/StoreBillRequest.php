@@ -31,6 +31,17 @@ final class StoreBillRequest extends FormRequest
             'memo' => ['nullable', 'string', 'max:2000'],
             'purchaseOrderId' => ['nullable', 'uuid'],
             'currency' => ['nullable', 'string', 'size:3'],
+            'status' => ['nullable', 'string', 'in:posted,mismatch'],
+            'lines' => ['nullable', 'array'],
+            'lines.*.purchaseOrderLineId' => ['nullable', 'uuid'],
+            'lines.*.itemId' => ['nullable', 'uuid'],
+            'lines.*.description' => ['nullable', 'string', 'max:512'],
+            'lines.*.qty' => ['nullable', 'numeric', 'min:0'],
+            'lines.*.unit' => ['nullable', 'string', 'max:32'],
+            'lines.*.unitPriceMinor' => ['nullable', 'integer', 'min:0'],
+            'lines.*.netMinor' => ['nullable', 'integer', 'min:0'],
+            'lines.*.taxMinor' => ['nullable', 'integer', 'min:0'],
+            'lines.*.grossMinor' => ['nullable', 'integer', 'min:0'],
         ];
     }
 }
