@@ -10,6 +10,7 @@ use App\Modules\Catalog\Actions\CreateParty;
 use App\Modules\Catalog\Actions\UpdateParty;
 use App\Modules\Catalog\Queries\GetPartyQuery;
 use App\Modules\Catalog\Queries\ListPartiesQuery;
+use App\Modules\Payables\Queries\GetSupplierStatementQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -20,6 +21,7 @@ final class PartyController
         private readonly GetPartyQuery $getPartyQuery,
         private readonly CreateParty $createParty,
         private readonly UpdateParty $updateParty,
+        private readonly GetSupplierStatementQuery $getSupplierStatementQuery,
     ) {
     }
 
@@ -39,6 +41,14 @@ final class PartyController
     public function show(string $id): JsonResponse
     {
         return response()->json($this->getPartyQuery->execute($id));
+    }
+
+    public function statement(string $id, Request $request): JsonResponse
+    {
+        return response()->json($this->getSupplierStatementQuery->execute($id, [
+            'from' => $request->query('from'),
+            'to' => $request->query('to'),
+        ]));
     }
 
     public function store(StorePartyRequest $request): JsonResponse
