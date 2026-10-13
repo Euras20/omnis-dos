@@ -36,7 +36,7 @@ final class GetBillQuery
         $bill = Bill::query()
             ->where('company_id', $companyId)
             ->where('id', $id)
-            ->with('supplier:id,code,name')
+            ->with(['supplier:id,code,name', 'lines'])
             ->first();
 
         if ($bill === null) {
@@ -67,6 +67,19 @@ final class GetBillQuery
             'journalId' => $bill->journal_id,
             'memo' => $bill->memo,
             'createdBy' => $bill->created_by,
+            'lines' => $bill->lines->map(static fn ($l) => [
+                'id' => $l->id,
+                'lineNo' => $l->line_no,
+                'purchaseOrderLineId' => $l->purchase_order_line_id,
+                'itemId' => $l->item_id,
+                'description' => $l->description,
+                'qty' => (string) $l->qty,
+                'unit' => $l->unit,
+                'unitPriceMinor' => $l->unit_price_minor,
+                'netMinor' => $l->net_minor,
+                'taxMinor' => $l->tax_minor,
+                'grossMinor' => $l->gross_minor,
+            ])->all(),
             'createdAt' => $bill->created_at?->toIso8601String(),
             'updatedAt' => $bill->updated_at?->toIso8601String(),
         ];
