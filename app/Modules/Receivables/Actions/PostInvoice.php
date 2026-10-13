@@ -10,6 +10,8 @@ use App\Models\Invoice;
 use App\Models\InvoiceLine;
 use App\Models\NumberSequence;
 use App\Models\Party;
+use App\Models\SalesOrder;
+use App\Models\SalesOrderLine;
 use App\Models\TaxRuleVersion;
 use App\Modules\Ledger\Domain\PostingKey;
 use App\Modules\Ledger\Domain\PostingLine;
@@ -79,7 +81,9 @@ final class PostInvoice
         $memo = isset($data['memo']) ? trim((string) $data['memo']) : null;
         $requestId = $this->companyContext->requestId();
 
-        $salesOrderId = isset($data['salesOrderId']) ? (string) $data['salesOrderId'] : null;
+        $salesOrderId = isset($data['salesOrderId']) && $data['salesOrderId'] !== ''
+            ? (string) $data['salesOrderId']
+            : null;
 
         return DB::transaction(function () use (
             $companyId,
@@ -94,6 +98,28 @@ final class PostInvoice
             $requestId,
             $salesOrderId,
         ) {
+            // When billing from an order, lock the order and require confirmed status.
+            // Delivery is NOT required to invoice (advance / pre-delivery billing is allowed);
+            // double-billing is prevented via sales_order_line.qty_invoiced.
+            if ($salesOrderId !== null) {
+                $order = SalesOrder::query()
+                    ->where('company_id', $companyId)
+                    ->where('id', $salesOrderId)
+                    ->lockForUpdate()
+                    ->first();
+                if ($order === null) {
+                    throw new NotFoundException('Sales order not found.');
+                }
+                if ((string) $order->customer_id !== $customerId) {
+                    throw new BusinessRuleException('salesOrderId does not belong to this customer.');
+                }
+                if (! in_array($order->status, ['confirmed', 'closed'], true)) {
+                    throw new BusinessRuleException(
+                        'Only confirmed sales orders can be invoiced (current status: '.$order->status.').'
+                    );
+                }
+            }
+
             $invoiceId = Uuid::v7();
             $invoiceNo = $this->nextNumber($companyId, $invoiceDate, 'invoice');
 
@@ -121,6 +147,66 @@ final class PostInvoice
                     throw new BusinessRuleException("Line {$i} unitPriceMinor cannot be negative.");
                 }
 
+                $salesOrderLineId = isset($raw['salesOrderLineId']) && $raw['salesOrderLineId'] !== ''
+                    ? (string) $raw['salesOrderLineId']
+                    : null;
+
+                // Billing against an order requires line linkage so qty_invoiced can be updated.
+                if ($salesOrderId !== null && $salesOrderLineId === null) {
+                    throw new BusinessRuleException(
+                        "Line {$i}: salesOrderLineId is required when salesOrderId is set (prevents double billing)."
+                    );
+                }
+
+                if ($salesOrderLineId !== null) {
+                    $soLine = SalesOrderLine::query()
+                        ->where('company_id', $companyId)
+                        ->where('id', $salesOrderLineId)
+                        ->lockForUpdate()
+                        ->first();
+                    if ($soLine === null) {
+                        throw new NotFoundException("Line {$i}: sales order line not found.");
+                    }
+                    if ($salesOrderId !== null && (string) $soLine->sales_order_id !== $salesOrderId) {
+                        throw new BusinessRuleException(
+                            "Line {$i}: salesOrderLineId does not belong to salesOrderId."
+                        );
+                    }
+                    // Infer header sales_order_id from line when omitted.
+                    if ($salesOrderId === null) {
+                        $salesOrderId = (string) $soLine->sales_order_id;
+                        $order = SalesOrder::query()
+                            ->where('company_id', $companyId)
+                            ->where('id', $salesOrderId)
+                            ->lockForUpdate()
+                            ->first();
+                        if ($order === null) {
+                            throw new NotFoundException('Sales order not found.');
+                        }
+                        if ((string) $order->customer_id !== $customerId) {
+                            throw new BusinessRuleException('Order customer does not match invoice customer.');
+                        }
+                        if (! in_array($order->status, ['confirmed', 'closed'], true)) {
+                            throw new BusinessRuleException(
+                                'Only confirmed sales orders can be invoiced (current status: '.$order->status.').'
+                            );
+                        }
+                    }
+
+                    $ordered = (float) $soLine->qty;
+                    $alreadyInvoiced = (float) $soLine->qty_invoiced;
+                    $remaining = $ordered - $alreadyInvoiced;
+                    if ($qty > $remaining + 0.0005) {
+                        throw new BusinessRuleException(
+                            "Line {$i}: cannot invoice {$qty}; only {$remaining} remaining on order line "
+                            ."(ordered {$ordered}, already invoiced {$alreadyInvoiced})."
+                        );
+                    }
+
+                    $soLine->qty_invoiced = number_format($alreadyInvoiced + $qty, 3, '.', '');
+                    $soLine->save();
+                }
+
                 $net = (int) round($qty * $unitPrice);
                 $tax = TaxBreakdown::fromNet($net, $taxRates);
 
@@ -131,6 +217,7 @@ final class PostInvoice
                 $line->invoice_id = $invoiceId;
                 $line->line_no = $i + 1;
                 $line->item_id = isset($raw['itemId']) ? (string) $raw['itemId'] : null;
+                $line->sales_order_line_id = $salesOrderLineId;
                 $line->description = $description;
                 $line->qty = $qty;
                 $line->unit = (string) ($raw['unit'] ?? 'pcs');
@@ -367,6 +454,7 @@ final class PostInvoice
                 'id' => $l->id,
                 'lineNo' => $l->line_no,
                 'itemId' => $l->item_id,
+                'salesOrderLineId' => $l->sales_order_line_id,
                 'description' => $l->description,
                 'qty' => (float) $l->qty,
                 'unit' => $l->unit,
