@@ -31,6 +31,8 @@ final class StoreInvoiceRequest extends FormRequest
             'lines.*.unitPriceMinor' => ['required', 'integer', 'min:0'],
             'lines.*.itemId' => ['nullable', 'uuid'],
             'lines.*.unit' => ['nullable', 'string', 'max:32'],
+            // Required when salesOrderId is set — links invoice line → order line and updates qty_invoiced.
+            'lines.*.salesOrderLineId' => ['nullable', 'uuid'],
         ];
     }
 }
