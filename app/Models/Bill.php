@@ -65,4 +65,9 @@ class Bill extends Model
     {
         return $this->hasMany(PaymentAllocation::class, 'bill_id');
     }
+
+    public function lines(): HasMany
+    {
+        return $this->hasMany(BillLine::class, 'bill_id')->orderBy('line_no');
+    }
 }
