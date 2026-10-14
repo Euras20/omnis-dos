@@ -80,22 +80,68 @@ final class UpdateItem
                 $item->item_type = trim((string) ($data['itemType'] ?? $data['type'] ?? $item->item_type));
             }
 
-            if (array_key_exists('categoryCode', $data)) {
-                $categoryCode = $data['categoryCode'];
-                if ($categoryCode === null || $categoryCode === '') {
-                    $item->category_code = null;
-                } else {
-                    $categoryCode = strtoupper(trim((string) $categoryCode));
-                    $exists = ItemCategory::query()
-                        ->where('company_id', $companyId)
-                        ->where('code', $categoryCode)
-                        ->where('is_active', true)
-                        ->exists();
-                    if (! $exists) {
-                        throw new BusinessRuleException("Item category '{$categoryCode}' was not found or is inactive.");
+            // Category: accept categoryCode (string code) and/or categoryId (UUID).
+            // Only mutates when at least one of those keys is present.
+            // Explicit null/"" clears; omit both keys → leave existing category_code unchanged.
+            if (array_key_exists('categoryCode', $data) || array_key_exists('categoryId', $data)) {
+                $resolvedCode = null;
+                $clear = false;
+
+                if (array_key_exists('categoryId', $data)) {
+                    $categoryId = $data['categoryId'];
+                    if ($categoryId === null || $categoryId === '') {
+                        $clear = true;
+                    } else {
+                        $byId = ItemCategory::query()
+                            ->where('company_id', $companyId)
+                            ->where('id', (string) $categoryId)
+                            ->where('is_active', true)
+                            ->first();
+                        if ($byId === null) {
+                            throw new BusinessRuleException('categoryId was not found or is inactive.');
+                        }
+                        $resolvedCode = $byId->code;
                     }
-                    $item->category_code = $categoryCode;
                 }
+
+                if (array_key_exists('categoryCode', $data)) {
+                    $categoryCode = $data['categoryCode'];
+                    if ($categoryCode === null || $categoryCode === '') {
+                        // Only clear when categoryId did not resolve a code.
+                        if ($resolvedCode === null) {
+                            $clear = true;
+                        }
+                    } else {
+                        $categoryCode = strtoupper(trim((string) $categoryCode));
+                        // Allow UUID mistakenly sent as categoryCode.
+                        if (preg_match('/^[0-9a-fA-F-]{36}$/', $categoryCode) === 1) {
+                            $byId = ItemCategory::query()
+                                ->where('company_id', $companyId)
+                                ->where('id', $categoryCode)
+                                ->where('is_active', true)
+                                ->first();
+                            if ($byId === null) {
+                                throw new BusinessRuleException('categoryCode/id was not found or is inactive.');
+                            }
+                            $resolvedCode = $byId->code;
+                        } else {
+                            $exists = ItemCategory::query()
+                                ->where('company_id', $companyId)
+                                ->where('code', $categoryCode)
+                                ->where('is_active', true)
+                                ->exists();
+                            if (! $exists) {
+                                throw new BusinessRuleException(
+                                    "Item category '{$categoryCode}' was not found or is inactive."
+                                );
+                            }
+                            $resolvedCode = $categoryCode;
+                        }
+                        $clear = false;
+                    }
+                }
+
+                $item->category_code = $clear ? null : $resolvedCode;
             }
 
             if (array_key_exists('unit', $data) && $data['unit'] !== null) {
@@ -173,12 +219,18 @@ final class UpdateItem
 
             RowVersion::bump($item);
             $item->save();
+            $item->refresh();
 
             $this->auditWriter->write(
                 action: 'item.updated',
                 entityType: 'item',
                 entityId: $item->id,
-                detail: ['sku' => $item->sku, 'name' => $item->name, 'isActive' => $item->is_active],
+                detail: [
+                    'sku' => $item->sku,
+                    'name' => $item->name,
+                    'categoryCode' => $item->category_code,
+                    'isActive' => $item->is_active,
+                ],
                 actorId: $actorId,
             );
 
