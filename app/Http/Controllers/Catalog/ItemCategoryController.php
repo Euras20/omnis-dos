@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Catalog;
 
 use App\Http\Requests\Catalog\StoreItemCategoryRequest;
+use App\Http\Requests\Catalog\UpdateItemCategoryRequest;
 use App\Modules\Catalog\Actions\CreateItemCategory;
+use App\Modules\Catalog\Actions\UpdateItemCategory;
 use App\Modules\Catalog\Queries\ListItemCategoriesQuery;
 use Illuminate\Http\JsonResponse;
 
@@ -14,6 +16,7 @@ final class ItemCategoryController
     public function __construct(
         private readonly ListItemCategoriesQuery $listItemCategoriesQuery,
         private readonly CreateItemCategory $createItemCategory,
+        private readonly UpdateItemCategory $updateItemCategory,
     ) {
     }
 
@@ -27,5 +30,12 @@ final class ItemCategoryController
         $category = $this->createItemCategory->execute($request->validated());
 
         return response()->json($category, 201);
+    }
+
+    public function update(string $id, UpdateItemCategoryRequest $request): JsonResponse
+    {
+        $category = $this->updateItemCategory->execute($id, $request->validated());
+
+        return response()->json($category);
     }
 }
