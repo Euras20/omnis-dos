@@ -90,13 +90,16 @@ final class UpsertExchangeRates
                 $result[] = self::toArray($rate);
             }
 
+            // entity_id is UUID-typed; this command upserts many rates for one date,
+            // so leave entity_id null and record the date + currencies in detail.
             $this->auditWriter->write(
                 action: 'exchange_rates.upserted',
                 entityType: 'exchange_rate',
-                entityId: $date,
+                entityId: null,
                 detail: [
                     'date' => $date,
                     'currencies' => array_column($result, 'currency'),
+                    'rateIds' => array_column($result, 'id'),
                 ],
                 actorId: $actorId,
             );
