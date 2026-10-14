@@ -180,8 +180,11 @@ Route::prefix('v1')->group(function () {
             Route::delete('/locations/{id}', [LocationController::class, 'destroy']);
 
             Route::post('/item-categories', [ItemCategoryController::class, 'store']);
+            Route::patch('/item-categories/{id}', [ItemCategoryController::class, 'update']);
             Route::post('/items', [ItemController::class, 'store']);
+            Route::patch('/items/{id}', [ItemController::class, 'update']);
             Route::post('/order-types', [OrderTypeController::class, 'store']);
+            Route::patch('/order-types/{id}', [OrderTypeController::class, 'update']);
 
             Route::post('/tax/rules', [TaxRuleController::class, 'store']);
             Route::put('/fx/rates/{date}', [FxRateController::class, 'upsert']);
