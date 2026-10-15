@@ -34,6 +34,7 @@ use App\Http\Controllers\Sales\SalesOrderController;
 use App\Http\Controllers\Payroll\EmployeeController;
 use App\Http\Controllers\Payroll\PayrollRunController;
 use App\Http\Controllers\Assets\AssetController;
+use App\Http\Controllers\Platform\ImportController;
 use App\Http\Controllers\Treasury\BankImportController;
 use App\Http\Controllers\Treasury\ExpenseController;
 use App\Http\Controllers\Treasury\TransferController;
