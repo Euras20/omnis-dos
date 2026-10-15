@@ -6,6 +6,7 @@ namespace App\Modules\Identity\Queries;
 
 use App\Models\AppUser;
 use App\Models\Company;
+use App\Modules\Controls\Queries\SystemAlertsQuery;
 use App\Modules\Identity\Services\EffectivePermissionResolver;
 use Illuminate\Support\Facades\DB;
 
@@ -16,6 +17,7 @@ final class GetMeQuery
 {
     public function __construct(
         private readonly EffectivePermissionResolver $permissionResolver,
+        private readonly SystemAlertsQuery $systemAlertsQuery,
     ) {
     }
 
@@ -60,6 +62,8 @@ final class GetMeQuery
 
         $permissions = $this->permissionResolver->allowedCodes($user);
 
+        $alerts = $this->systemAlertsQuery->execute();
+
         return [
             'id' => (string) $user->id,
             'email' => $user->email,
@@ -80,6 +84,7 @@ final class GetMeQuery
             'roles' => $roles,
             'permissions' => $permissions,
             'locationScope' => $locationIds,
+            'alerts' => $alerts,
         ];
     }
 }

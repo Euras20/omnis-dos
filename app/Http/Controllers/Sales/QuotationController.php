@@ -7,9 +7,11 @@ namespace App\Http\Controllers\Sales;
 use App\Http\Requests\Sales\ChangeQuotationStatusRequest;
 use App\Http\Requests\Sales\ConvertQuotationRequest;
 use App\Http\Requests\Sales\StoreQuotationRequest;
+use App\Http\Requests\Sales\UpdateQuotationRequest;
 use App\Modules\Sales\Actions\ChangeQuotationStatus;
 use App\Modules\Sales\Actions\ConvertQuotation;
 use App\Modules\Sales\Actions\CreateQuotation;
+use App\Modules\Sales\Actions\UpdateQuotation;
 use App\Modules\Sales\Queries\GetQuotationQuery;
 use App\Modules\Sales\Queries\ListQuotationsQuery;
 use Illuminate\Http\JsonResponse;
@@ -21,6 +23,7 @@ final class QuotationController
         private readonly ListQuotationsQuery $listQuotationsQuery,
         private readonly GetQuotationQuery $getQuotationQuery,
         private readonly CreateQuotation $createQuotation,
+        private readonly UpdateQuotation $updateQuotation,
         private readonly ChangeQuotationStatus $changeQuotationStatus,
         private readonly ConvertQuotation $convertQuotation,
     ) {
@@ -49,6 +52,13 @@ final class QuotationController
         $quotation = $this->createQuotation->execute($request->validated());
 
         return response()->json($quotation, 201);
+    }
+
+    public function update(string $id, UpdateQuotationRequest $request): JsonResponse
+    {
+        $quotation = $this->updateQuotation->execute($id, $request->validated());
+
+        return response()->json($quotation);
     }
 
     public function status(string $id, ChangeQuotationStatusRequest $request): JsonResponse

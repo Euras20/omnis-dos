@@ -68,6 +68,10 @@ final class CreateQuotation
         }
 
         $currency = strtoupper((string) ($data['currency'] ?? $customer->currency ?? 'GHS'));
+        $discountPercent = isset($data['discountPercent']) ? (float) $data['discountPercent'] : 0.0;
+        if ($discountPercent < 0 || $discountPercent > 100) {
+            throw new BusinessRuleException('discountPercent must be between 0 and 100.');
+        }
         $validUntil = isset($data['validUntil']) ? (string) $data['validUntil'] : null;
         $memo = isset($data['memo']) ? trim((string) $data['memo']) : null;
         $requestId = $this->companyContext->requestId();
@@ -81,6 +85,7 @@ final class CreateQuotation
             $validUntil,
             $rawLines,
             $currency,
+            $discountPercent,
             $memo,
             $actorId,
             $requestId,
@@ -149,6 +154,10 @@ final class CreateQuotation
                 ];
             }
 
+            $discountedNet = (int) round($headerNet * (1 - $discountPercent / 100));
+            $discountedTax = (int) round($discountedNet * $combinedTaxRate);
+            $discountedGross = $discountedNet + $discountedTax;
+
             $quotation = new Quotation;
             $quotation->fill([
                 'id' => $quotationId,
@@ -158,10 +167,11 @@ final class CreateQuotation
                 'quotation_date' => $quotationDate,
                 'valid_until' => $validUntil,
                 'currency' => $currency,
+                'discount_percent' => $discountPercent,
                 'status' => QuotationStatus::DRAFT,
-                'net_minor' => $headerNet,
-                'tax_total_minor' => $headerTax,
-                'gross_minor' => $headerNet + $headerTax,
+                'net_minor' => $discountedNet,
+                'tax_total_minor' => $discountedTax,
+                'gross_minor' => $discountedGross,
                 'tax_snapshot' => $taxRates,
                 'memo' => $memo,
                 'created_by' => $actorId,
@@ -182,7 +192,8 @@ final class CreateQuotation
                 detail: [
                     'quotationNo' => $quotationNo,
                     'customerId' => $customerId,
-                    'grossMinor' => $headerNet + $headerTax,
+                    'discountPercent' => $discountPercent,
+                    'grossMinor' => $discountedGross,
                     'lineCount' => count($lineRows),
                 ],
                 actorId: $actorId,
@@ -280,6 +291,7 @@ final class CreateQuotation
             'validUntil' => $quotation->valid_until?->format('Y-m-d'),
             'currency' => $quotation->currency,
             'status' => $quotation->status,
+            'discountPercent' => (float) $quotation->discount_percent,
             'netMinor' => $quotation->net_minor,
             'taxTotalMinor' => $quotation->tax_total_minor,
             'grossMinor' => $quotation->gross_minor,

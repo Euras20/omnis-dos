@@ -24,6 +24,7 @@ final class StoreQuotationRequest extends FormRequest
             'validUntil' => ['nullable', 'date_format:Y-m-d'],
             'currency' => ['nullable', 'string', 'size:3'],
             'memo' => ['nullable', 'string', 'max:2000'],
+            'discountPercent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.description' => ['nullable', 'string', 'max:512'],
             'lines.*.qty' => ['required', 'numeric', 'gt:0'],

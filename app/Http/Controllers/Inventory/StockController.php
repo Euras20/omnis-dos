@@ -19,6 +19,7 @@ use App\Modules\Inventory\Queries\ListAssignmentsQuery;
 use App\Modules\Inventory\Queries\ListStockCountsQuery;
 use App\Modules\Inventory\Queries\ListStockMovementsQuery;
 use App\Modules\Inventory\Queries\ListStockTransfersQuery;
+use App\Modules\Inventory\Queries\LowStockAlertQuery;
 use App\Modules\Inventory\Queries\OrderTrackingQuery;
 use App\Modules\Inventory\Queries\StockOnHandQuery;
 use App\Modules\Inventory\Queries\TraceabilityQuery;
@@ -41,6 +42,7 @@ final class StockController
         private readonly SubmitStockCount $submitStockCount,
         private readonly ApproveStockCount $approveStockCount,
         private readonly OrderTrackingQuery $orderTrackingQuery,
+        private readonly LowStockAlertQuery $lowStockAlertQuery,
     ) {
     }
 
@@ -50,6 +52,15 @@ final class StockController
             'itemId' => $request->query('itemId'),
             'locationId' => $request->query('locationId'),
             'lot' => $request->query('lot'),
+            'q' => $request->query('q'),
+            'limit' => $request->query('limit'),
+            'offset' => $request->query('offset'),
+        ]));
+    }
+
+    public function lowStock(Request $request): JsonResponse
+    {
+        return response()->json($this->lowStockAlertQuery->execute([
             'q' => $request->query('q'),
             'limit' => $request->query('limit'),
             'offset' => $request->query('offset'),
