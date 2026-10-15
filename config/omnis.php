@@ -77,6 +77,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | FX / XE.com
+    |--------------------------------------------------------------------------
+    | Official XE Currency Data API credentials (optional).
+    | When both are set the fetch uses xecdapi.xe.com; otherwise a free
+    | mid-market source is used and the stored source label reflects that.
+    | Selling rates are always stored with a 3% markup over the mid rate.
+    */
+    'xe' => [
+        'account_id' => env('XE_ACCOUNT_ID'),
+        'api_key' => env('XE_API_KEY'),
+        'base_url' => env('XE_BASE_URL', 'https://xecdapi.xe.com/v1'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Feature flags (only flags already implied by the frontend)
     |--------------------------------------------------------------------------
     */

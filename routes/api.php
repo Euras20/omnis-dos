@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Controls\AlertsController;
 use App\Http\Controllers\Catalog\DocumentTemplateController;
 use App\Http\Controllers\Catalog\FxRateController;
 use App\Http\Controllers\Catalog\ItemCategoryController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\Ledger\AccountController;
 use App\Http\Controllers\Ledger\JournalController;
 use App\Http\Controllers\Inventory\DeliveryController;
 use App\Http\Controllers\Inventory\StockController;
+use App\Http\Controllers\Fulfillment\DeliveryNoteController;
 use App\Http\Controllers\Payables\BillController;
 use App\Http\Controllers\Payables\SupplierPaymentController;
 use App\Http\Controllers\Procurement\GoodsReceiptController;
@@ -32,9 +34,12 @@ use App\Http\Controllers\Sales\SalesOrderController;
 use App\Http\Controllers\Payroll\EmployeeController;
 use App\Http\Controllers\Payroll\PayrollRunController;
 use App\Http\Controllers\Assets\AssetController;
+use App\Http\Controllers\Treasury\BankImportController;
 use App\Http\Controllers\Treasury\ExpenseController;
 use App\Http\Controllers\Treasury\TransferController;
-use App\Http\Controllers\Platform\DocumentController;
+use App\Http\Controllers\Logistics\CustomsController;
+use App\Http\Controllers\Logistics\LogisticsSupportController;
+use App\Http\Controllers\Logistics\ShipmentController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -76,6 +81,9 @@ Route::prefix('v1')->group(function () {
         // --- Identity: session ---
         Route::get('/me', MeController::class);
 
+        // --- System alerts (internal users only; empty for portal) ---
+        Route::get('/alerts', [AlertsController::class, 'index']);
+
         // --- Identity: administration (queries) ---
         Route::get('/admin/permissions', [PermissionController::class, 'index']);
         Route::get('/admin/roles', [RoleController::class, 'index']);
@@ -114,6 +122,7 @@ Route::prefix('v1')->group(function () {
 
         // --- Inventory / Stock: queries ---
         Route::get('/stock/on-hand', [StockController::class, 'onHand']);
+        Route::get('/stock/low-stock', [StockController::class, 'lowStock']);
         Route::get('/stock/assignments', [StockController::class, 'assignments']);
         Route::get('/stock/movements', [StockController::class, 'movements']);
         Route::get('/stock/ledger', [StockController::class, 'ledger']);
@@ -122,6 +131,19 @@ Route::prefix('v1')->group(function () {
         Route::get('/stock/counts', [StockController::class, 'counts']);
         Route::get('/stock/counts/{id}', [StockController::class, 'showCount']);
         Route::get('/tracking', [StockController::class, 'tracking']);
+
+        // --- Delivery workflow (15.5) ---
+        Route::get('/delivery-notes', [DeliveryNoteController::class, 'index']);
+        Route::get('/delivery-notes/{id}', [DeliveryNoteController::class, 'show']);
+
+        // --- Logistics (15.6 — jobs excluded) ---
+        Route::get('/shipments', [ShipmentController::class, 'index']);
+        Route::get('/shipments/{id}', [ShipmentController::class, 'show']);
+        Route::get('/shipments/{id}/landed-cost', [ShipmentController::class, 'landedCost']);
+        Route::get('/customs', [CustomsController::class, 'index']);
+        Route::get('/customs/{id}', [CustomsController::class, 'show']);
+        Route::get('/eta-revisions', [LogisticsSupportController::class, 'listEtas']);
+        Route::get('/logistics/exceptions', [LogisticsSupportController::class, 'exceptions']);
 
         // --- Sales: queries ---
         Route::get('/quotations', [QuotationController::class, 'index']);
@@ -151,7 +173,12 @@ Route::prefix('v1')->group(function () {
         Route::get('/assets', [AssetController::class, 'index']);
         Route::get('/asset-classes', [AssetController::class, 'classes']);
 
+        // --- Imports: templates ---
+        Route::get('/imports/templates', [ImportController::class, 'templates']);
+        Route::get('/imports/templates/{type}', [ImportController::class, 'template']);
+
         // --- Treasury: queries ---
+        Route::get('/bank/imports', [BankImportController::class, 'index']);
         Route::get('/expenses', [ExpenseController::class, 'index']);
 
         // State-changing commands also require Idempotency-Key.
@@ -188,6 +215,7 @@ Route::prefix('v1')->group(function () {
 
             Route::post('/tax/rules', [TaxRuleController::class, 'store']);
             Route::put('/fx/rates/{date}', [FxRateController::class, 'upsert']);
+            Route::post('/fx/rates/fetch-xe', [FxRateController::class, 'fetchXe']);
 
             Route::put('/document-templates/{type}/draft', [DocumentTemplateController::class, 'saveDraft']);
             Route::delete('/document-templates/{type}/draft', [DocumentTemplateController::class, 'discardDraft']);
@@ -216,8 +244,27 @@ Route::prefix('v1')->group(function () {
             Route::post('/stock/counts/{id}/approve', [StockController::class, 'approveCount']);
             Route::post('/deliveries', [DeliveryController::class, 'store']);
 
+            // --- Delivery workflow (15.5) ---
+            Route::post('/delivery-notes', [DeliveryNoteController::class, 'store']);
+            Route::post('/delivery-notes/{id}/pick', [DeliveryNoteController::class, 'pick']);
+            Route::post('/delivery-notes/{id}/pack', [DeliveryNoteController::class, 'pack']);
+            Route::post('/delivery-notes/{id}/dispatch', [DeliveryNoteController::class, 'dispatch']);
+            Route::post('/delivery-notes/{id}/confirm', [DeliveryNoteController::class, 'confirm']);
+            Route::post('/delivery-notes/{id}/fail', [DeliveryNoteController::class, 'fail']);
+            Route::post('/delivery-notes/{id}/reschedule', [DeliveryNoteController::class, 'reschedule']);
+
+            // --- Logistics (15.6) ---
+            Route::post('/shipments', [ShipmentController::class, 'store']);
+            Route::post('/shipments/{id}/events', [ShipmentController::class, 'recordEvent']);
+            Route::post('/shipments/{id}/consignments/{cid}/receive', [ShipmentController::class, 'receive']);
+            Route::post('/customs', [CustomsController::class, 'store']);
+            Route::post('/customs/{id}/release', [CustomsController::class, 'release']);
+            Route::post('/landed-costs', [LogisticsSupportController::class, 'storeLandedCost']);
+            Route::post('/eta-revisions', [LogisticsSupportController::class, 'storeEta']);
+
             // --- Sales: commands ---
             Route::post('/quotations', [QuotationController::class, 'store']);
+            Route::put('/quotations/{id}', [QuotationController::class, 'update']);
             Route::post('/quotations/{id}/status', [QuotationController::class, 'status']);
             Route::post('/quotations/{id}/convert', [QuotationController::class, 'convert']);
             Route::post('/sales-orders', [SalesOrderController::class, 'store']);
@@ -250,6 +297,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/assets/depreciation/{month}', [AssetController::class, 'postDepreciation']);
 
             // --- Treasury: commands ---
+            Route::post('/imports/{type}', [ImportController::class, 'store']);
+            Route::post("/bank/imports", [BankImportController::class, "store"]);
             Route::post('/expenses', [ExpenseController::class, 'store']);
             Route::post('/transfers', [TransferController::class, 'store']);
         });

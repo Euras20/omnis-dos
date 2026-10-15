@@ -47,6 +47,7 @@ final class GetQuotationQuery
             'quotationDate' => $quotation->quotation_date?->format('Y-m-d'),
             'validUntil' => $quotation->valid_until?->format('Y-m-d'),
             'currency' => $quotation->currency,
+            'discountPercent' => (float) $quotation->discount_percent,
             'status' => $quotation->status,
             'netMinor' => $quotation->net_minor,
             'taxTotalMinor' => $quotation->tax_total_minor,

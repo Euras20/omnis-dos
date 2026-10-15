@@ -49,6 +49,8 @@ final class PermissionCatalogue
             self::entry('po.view', 'Purchasing', 'Purchase orders', 'View', 'View purchase orders', false),
             self::entry('po.create', 'Purchasing', 'Purchase orders', 'Create', 'Create purchase orders', false),
             self::entry('po.approve', 'Purchasing', 'Purchase orders', 'Approve', 'Approve purchase orders', true),
+            self::entry('po.cancel', 'Purchasing', 'Purchase orders', 'Cancel', 'Cancel draft or unreceived purchase orders', true),
+            self::entry('po.close', 'Purchasing', 'Purchase orders', 'Close', 'Close approved purchase orders', true),
             self::entry('suppliers.view', 'Purchasing', 'Suppliers', 'View', 'View suppliers', false),
             self::entry('suppliers.manage', 'Purchasing', 'Suppliers', 'Manage', 'Create and edit suppliers', false),
 
@@ -59,8 +61,11 @@ final class PermissionCatalogue
             self::entry('ap.payment.prepare', 'Purchasing', 'Supplier payments', 'Prepare', 'Prepare supplier payments', true),
             self::entry('ap.payment.confirm', 'Purchasing', 'Supplier payments', 'Confirm', 'Confirm supplier payments', true),
 
-            // Stock
-            self::entry('stock.view', 'Stock', 'Stock on hand', 'View', 'View stock on hand', false),
+            // Logistics (15.6 — jobs excluded)
+            self::entry('logistics.view', 'Logistics', 'Shipments and customs', 'View', 'View shipments, consignments, customs and ETAs', false),
+            self::entry('logistics.manage', 'Logistics', 'Shipments', 'Manage', 'Create shipments and record cargo events', false),
+            self::entry('logistics.customs', 'Logistics', 'Customs', 'Manage', 'Create and release customs declarations', true),
+            self::entry('logistics.costs', 'Logistics', 'Landed cost', 'Enter', 'Enter landed costs against shipments', true),
             self::entry('stock.move', 'Stock', 'Receiving and delivery', 'Move', 'Record stock movements', true),
             self::entry('stock.approve', 'Stock', 'Assignments and counts', 'Approve', 'Approve stock adjustments', true),
             self::entry('items.view', 'Stock', 'Items and locations', 'View', 'View items and locations', false),
