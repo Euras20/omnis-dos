@@ -46,8 +46,12 @@ final class ListPartiesQuery
             $query->where('id', $actor->party_id);
         }
 
-        if (! empty($filters['type']) && in_array($filters['type'], $allowedTypes, true)) {
-            $query->where('party_type', $filters['type']);
+        if (! empty($filters['type'])) {
+            $requested = array_map('trim', explode(',', (string) $filters['type']));
+            $requested = array_values(array_intersect($requested, $allowedTypes));
+            if ($requested !== []) {
+                $query->whereIn('party_type', $requested);
+            }
         }
 
         if (($filters['status'] ?? null) === 'active') {
@@ -100,6 +104,19 @@ final class ListPartiesQuery
             $types[] = 'supplier';
             $types[] = 'carrier';
             $types[] = 'broker';
+        }
+
+        // Logistics staff need carriers and brokers for shipment / customs selects
+        // even if they do not hold supplier permissions.
+        if ($this->permissionChecker->can($actorId, 'logistics.view')
+            || $this->permissionChecker->can($actorId, 'logistics.manage')
+            || $this->permissionChecker->can($actorId, 'logistics.customs')) {
+            if (! in_array('carrier', $types, true)) {
+                $types[] = 'carrier';
+            }
+            if (! in_array('broker', $types, true)) {
+                $types[] = 'broker';
+            }
         }
 
         return $types;

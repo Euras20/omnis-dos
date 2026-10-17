@@ -30,6 +30,8 @@ class Employee extends Model
             'termination_date' => 'date',
             'basic_minor' => 'integer',
             'is_active' => 'boolean',
+            'is_resident' => 'boolean',
+            'annual_leave_entitlement' => 'integer',
             'row_version' => 'integer',
         ];
     }

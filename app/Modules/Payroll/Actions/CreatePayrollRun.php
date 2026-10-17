@@ -10,6 +10,7 @@ use App\Models\NumberSequence;
 use App\Models\PayrollLine;
 use App\Models\PayrollRuleVersion;
 use App\Models\PayrollRun;
+use App\Modules\Payroll\Services\PayrollCalculator;
 use App\Shared\Audit\AuditWriter;
 use App\Shared\Company\CompanyContext;
 use App\Shared\Permissions\PermissionChecker;
@@ -18,6 +19,9 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * POST /api/v1/payroll/runs — create draft run for a month with lines from active employees.
+ *
+ * Calculation matches frontend Ghana rules (PAYE band widths, SSNIT on insurable basic,
+ * junior overtime tax, 24 h monthly OT cap). Exceptions block approval until resolved.
  */
 final class CreatePayrollRun
 {
@@ -25,6 +29,7 @@ final class CreatePayrollRun
         private readonly CompanyContext $companyContext,
         private readonly PermissionChecker $permissionChecker,
         private readonly AuditWriter $auditWriter,
+        private readonly PayrollCalculator $calculator,
     ) {
     }
 
@@ -48,7 +53,12 @@ final class CreatePayrollRun
             $overtimeByEmployee = [];
         }
 
-        return DB::transaction(function () use ($companyId, $actorId, $periodMonth, $overtimeByEmployee) {
+        $approvedOvertime = $data['overtimeApproved'] ?? $data['overtime_approved'] ?? [];
+        if (! is_array($approvedOvertime)) {
+            $approvedOvertime = [];
+        }
+
+        return DB::transaction(function () use ($companyId, $actorId, $periodMonth, $overtimeByEmployee, $approvedOvertime) {
             $exists = PayrollRun::query()
                 ->where('company_id', $companyId)
                 ->where('period_month', $periodMonth)
@@ -67,18 +77,7 @@ final class CreatePayrollRun
                 ->orderByDesc('effective_from')
                 ->first();
 
-            $rules = $rule?->rules ?? [
-                'ssfEmployeePct' => 5.5,
-                'ssfEmployerPct' => 13.0,
-                'payeBands' => [
-                    ['upTo' => 49000, 'rate' => 0],
-                    ['upTo' => 110000, 'rate' => 5],
-                    ['upTo' => 130000, 'rate' => 10],
-                    ['upTo' => 3000000, 'rate' => 17.5],
-                    ['upTo' => null, 'rate' => 25],
-                ],
-                'overtimeMultiplier' => 1.5,
-            ];
+            $rules = $rule?->rules ?? $this->calculator->defaultRules();
 
             $runNo = $this->allocateRunNo($companyId, $periodMonth);
             $runId = Uuid::v7();
@@ -93,8 +92,10 @@ final class CreatePayrollRun
             $ssfEmpTotal = 0;
             $ssfErTotal = 0;
             $payeTotal = 0;
+            $otTaxTotal = 0;
             $netTotal = 0;
             $lineNo = 0;
+            $exceptions = [];
 
             $run = new PayrollRun([
                 'id' => $runId,
@@ -110,22 +111,17 @@ final class CreatePayrollRun
 
             foreach ($employees as $emp) {
                 $lineNo++;
-                $basic = (int) $emp->basic_minor;
                 $otHours = (int) ($overtimeByEmployee[$emp->id] ?? $overtimeByEmployee[$emp->employee_no] ?? 0);
-                $hourly = $basic > 0 ? (int) round($basic / 173.33) : 0; // approx monthly hours
-                $multiplier = (float) ($rules['overtimeMultiplier'] ?? 1.5);
-                $otMinor = (int) round($otHours * $hourly * $multiplier);
-                $allowances = 0;
-                $gross = $basic + $otMinor + $allowances;
+                $isApproved = in_array($emp->id, $approvedOvertime, true)
+                    || in_array($emp->employee_no, $approvedOvertime, true)
+                    || ! empty($approvedOvertime[$emp->id])
+                    || ! empty($approvedOvertime[$emp->employee_no]);
 
-                $ssfEmpPct = (float) ($rules['ssfEmployeePct'] ?? 5.5);
-                $ssfErPct = (float) ($rules['ssfEmployerPct'] ?? 13.0);
-                $ssfEmp = (int) round($gross * $ssfEmpPct / 100);
-                $ssfEr = (int) round($gross * $ssfErPct / 100);
+                $calc = $this->calculator->calculate($emp, $otHours, $rules, $isApproved);
 
-                $taxable = $gross - $ssfEmp;
-                $paye = $this->computePaye($taxable, $rules['payeBands'] ?? []);
-                $net = $gross - $ssfEmp - $paye;
+                if ($calc['exception'] !== null) {
+                    $exceptions[] = $calc['exception'];
+                }
 
                 $line = new PayrollLine([
                     'id' => Uuid::v7(),
@@ -133,43 +129,60 @@ final class CreatePayrollRun
                     'payroll_run_id' => $runId,
                     'employee_id' => $emp->id,
                     'line_no' => $lineNo,
-                    'basic_minor' => $basic,
-                    'overtime_hours' => $otHours,
-                    'overtime_minor' => $otMinor,
-                    'allowances_minor' => $allowances,
-                    'gross_minor' => $gross,
-                    'ssf_employee_minor' => $ssfEmp,
-                    'ssf_employer_minor' => $ssfEr,
-                    'paye_minor' => $paye,
+                    'basic_minor' => $calc['basicMinor'],
+                    'overtime_hours' => $calc['overtimeHours'],
+                    'overtime_minor' => $calc['overtimeMinor'],
+                    'allowances_minor' => $calc['allowancesMinor'],
+                    'gross_minor' => $calc['grossMinor'],
+                    'ssf_employee_minor' => $calc['ssfEmployeeMinor'],
+                    'ssf_employer_minor' => $calc['ssfEmployerMinor'],
+                    'paye_minor' => $calc['payeMinor'],
+                    'ot_tax_minor' => $calc['otTaxMinor'],
                     'other_deductions_minor' => 0,
-                    'net_minor' => $net,
+                    'net_minor' => $calc['netMinor'],
                     'is_frozen' => false,
                     'calculation_snapshot' => [
-                        'ssfEmployeePct' => $ssfEmpPct,
-                        'ssfEmployerPct' => $ssfErPct,
+                        'ssnitEmp' => $rules['ssnitEmp'] ?? $rules['ssfEmployeePct'] ?? 5.5,
+                        'ssnitEr' => $rules['ssnitEr'] ?? $rules['ssfEmployerPct'] ?? 13.0,
+                        'insurableMinor' => $calc['insurableMinor'],
+                        'tier1Minor' => $calc['tier1Minor'],
+                        'tier2Minor' => $calc['tier2Minor'],
+                        'assessableMinor' => $calc['assessableMinor'],
+                        'reliefMinor' => $calc['reliefMinor'],
+                        'taxableMinor' => $calc['taxableMinor'],
+                        'isJunior' => $calc['isJunior'],
+                        'isResident' => $calc['isResident'],
+                        'otTaxMinor' => $calc['otTaxMinor'],
                     ],
                 ]);
                 $line->save();
 
-                $grossTotal += $gross;
-                $ssfEmpTotal += $ssfEmp;
-                $ssfErTotal += $ssfEr;
-                $payeTotal += $paye;
-                $netTotal += $net;
+                $grossTotal += $calc['grossMinor'];
+                $ssfEmpTotal += $calc['ssfEmployeeMinor'];
+                $ssfErTotal += $calc['ssfEmployerMinor'];
+                $payeTotal += $calc['payeMinor'];
+                $otTaxTotal += $calc['otTaxMinor'];
+                $netTotal += $calc['netMinor'];
             }
 
             $run->gross_total_minor = $grossTotal;
             $run->ssf_employee_minor = $ssfEmpTotal;
             $run->ssf_employer_minor = $ssfErTotal;
             $run->paye_minor = $payeTotal;
+            $run->ot_tax_total_minor = $otTaxTotal;
             $run->net_total_minor = $netTotal;
+            $run->exceptions = $exceptions === [] ? null : $exceptions;
             $run->save();
 
             $this->auditWriter->write(
                 action: 'payroll_run.created',
                 entityType: 'payroll_run',
                 entityId: $runId,
-                detail: ['period_month' => $periodMonth, 'line_count' => $lineNo],
+                detail: [
+                    'period_month' => $periodMonth,
+                    'line_count' => $lineNo,
+                    'exception_count' => count($exceptions),
+                ],
             );
 
             return [
@@ -181,8 +194,10 @@ final class CreatePayrollRun
                 'ssfEmployeeMinor' => $ssfEmpTotal,
                 'ssfEmployerMinor' => $ssfErTotal,
                 'payeMinor' => $payeTotal,
+                'otTaxTotalMinor' => $otTaxTotal,
                 'netTotalMinor' => $netTotal,
                 'lineCount' => $lineNo,
+                'exceptions' => $exceptions,
             ];
         });
     }
@@ -211,39 +226,5 @@ final class CreatePayrollRun
         $seq->save();
 
         return sprintf('PR-%s-%04d', str_replace('-', '', $periodMonth), $n);
-    }
-
-    /**
-     * @param  array<int, array{upTo: ?int, rate: float|int}>  $bands
-     */
-    private function computePaye(int $taxableMinor, array $bands): int
-    {
-        if ($taxableMinor <= 0 || $bands === []) {
-            return 0;
-        }
-
-        $remaining = $taxableMinor;
-        $tax = 0;
-        $prevUpTo = 0;
-
-        foreach ($bands as $band) {
-            $upTo = $band['upTo'] ?? null;
-            $rate = (float) ($band['rate'] ?? 0);
-            if ($upTo === null) {
-                $tax += (int) round($remaining * $rate / 100);
-                break;
-            }
-            $slice = min($remaining, (int) $upTo - $prevUpTo);
-            if ($slice > 0) {
-                $tax += (int) round($slice * $rate / 100);
-                $remaining -= $slice;
-            }
-            $prevUpTo = (int) $upTo;
-            if ($remaining <= 0) {
-                break;
-            }
-        }
-
-        return max(0, $tax);
     }
 }

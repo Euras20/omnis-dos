@@ -13,6 +13,7 @@ use App\Modules\Inventory\Domain\MovementRequest;
 use App\Modules\Inventory\Domain\MovementType;
 use App\Modules\Inventory\Services\MovementService;
 use App\Modules\Procurement\Domain\QcStatus;
+use App\Modules\Quality\Actions\CreateNonconformance;
 use App\Shared\Audit\AuditWriter;
 use App\Shared\Company\CompanyContext;
 use App\Shared\Permissions\PermissionChecker;
@@ -29,6 +30,7 @@ final class RecordQcResult
         private readonly PermissionChecker $permissionChecker,
         private readonly MovementService $movementService,
         private readonly AuditWriter $auditWriter,
+        private readonly CreateNonconformance $createNonconformance,
     ) {
     }
 
@@ -172,6 +174,25 @@ final class RecordQcResult
             $line->qc_at = now();
             $line->save();
 
+            $ncr = null;
+            if ((float) $qtyQuarantine > 0 || (float) $qtyRejected > 0) {
+                $issue = $qcNote !== null && $qcNote !== ''
+                    ? $qcNote
+                    : ((float) $qtyRejected > 0 ? 'Rejected on arrival inspection' : 'Quarantined on arrival inspection');
+                $ncr = $this->createNonconformance->execute([
+                    'issue' => $issue,
+                    'cause' => 'Under investigation with supplier',
+                    'action' => (float) $qtyQuarantine > 0 ? 'Re-inspect quarantined units' : 'Return rejected units to supplier',
+                    'sourceType' => 'qc_line',
+                    'sourceId' => $line->id,
+                    'itemId' => $line->item_id,
+                    'sku' => null,
+                    'qty' => (string) ((float) $qtyQuarantine + (float) $qtyRejected),
+                    'dueDate' => now()->addDays(7)->format('Y-m-d'),
+                    'ownerId' => $actorId,
+                ], skipPermissionCheck: true);
+            }
+
             $this->auditWriter->write(
                 action: 'goods_receipt.qc_recorded',
                 entityType: 'goods_receipt_line',
@@ -196,6 +217,7 @@ final class RecordQcResult
                 'qtyRejected' => (string) $line->qty_rejected,
                 'storeLocationId' => $line->store_location_id,
                 'qcAt' => $line->qc_at?->toIso8601String(),
+                'nonconformance' => $ncr,
             ];
         });
     }
