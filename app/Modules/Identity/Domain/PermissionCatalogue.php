@@ -66,6 +66,7 @@ final class PermissionCatalogue
             self::entry('logistics.manage', 'Logistics', 'Shipments', 'Manage', 'Create shipments and record cargo events', false),
             self::entry('logistics.customs', 'Logistics', 'Customs', 'Manage', 'Create and release customs declarations', true),
             self::entry('logistics.costs', 'Logistics', 'Landed cost', 'Enter', 'Enter landed costs against shipments', true),
+            self::entry('stock.view', 'Stock', 'Stock on hand', 'View', 'View stock on hand and low-stock alerts', false),
             self::entry('stock.move', 'Stock', 'Receiving and delivery', 'Move', 'Record stock movements', true),
             self::entry('stock.approve', 'Stock', 'Assignments and counts', 'Approve', 'Approve stock adjustments', true),
             self::entry('items.view', 'Stock', 'Items and locations', 'View', 'View items and locations', false),
