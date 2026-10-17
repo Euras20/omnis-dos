@@ -8,6 +8,7 @@ use App\Exceptions\BusinessRuleException;
 use App\Exceptions\NotFoundException;
 use App\Models\Consignment;
 use App\Models\NumberSequence;
+use App\Models\Party;
 use App\Models\PurchaseOrderLine;
 use App\Models\Shipment;
 use App\Models\ShipmentEvent;
@@ -55,7 +56,15 @@ final class CreateShipment
             throw new BusinessRuleException('At least one consignment is required.');
         }
 
-        return DB::transaction(function () use ($data, $consignments, $companyId, $actorId, $requestId) {
+        $carrierId = $data['carrierId'] ?? null;
+        $forwarderId = $data['forwarderId'] ?? null;
+        $shipperId = $data['shipperId'] ?? null;
+
+        $this->assertPartyOfType($companyId, $carrierId, ['carrier'], 'carrier');
+        $this->assertPartyOfType($companyId, $forwarderId, ['broker', 'carrier'], 'forwarder');
+        $this->assertPartyOfType($companyId, $shipperId, ['supplier', 'carrier', 'broker'], 'shipper');
+
+        return DB::transaction(function () use ($data, $consignments, $companyId, $actorId, $requestId, $carrierId, $forwarderId, $shipperId) {
             $shipmentId = Uuid::v7();
             $shipmentNo = $this->nextNumber($companyId, 'shipment', 'SH', date('Y'));
 
@@ -68,10 +77,10 @@ final class CreateShipment
             $shipment->mode = isset($data['mode']) ? trim((string) $data['mode']) : null;
             $shipment->booking = isset($data['booking']) ? trim((string) $data['booking']) : null;
             $shipment->incoterm = isset($data['incoterm']) ? trim((string) $data['incoterm']) : null;
-            $shipment->shipper_id = $data['shipperId'] ?? null;
+            $shipment->shipper_id = $shipperId;
             $shipment->consignee = isset($data['consignee']) ? trim((string) $data['consignee']) : 'Company';
-            $shipment->carrier_id = $data['carrierId'] ?? null;
-            $shipment->forwarder_id = $data['forwarderId'] ?? null;
+            $shipment->carrier_id = $carrierId;
+            $shipment->forwarder_id = $forwarderId;
             $shipment->insurance = isset($data['insurance']) ? trim((string) $data['insurance']) : null;
             $shipment->status = ShipmentStatus::BOOKED;
             $shipment->owner = isset($data['owner']) ? trim((string) $data['owner']) : null;
@@ -140,7 +149,9 @@ final class CreateShipment
                         $legModel->seq = (int) ($leg['seq'] ?? ($i + 1));
                         $legModel->from_location = (string) ($leg['from'] ?? '');
                         $legModel->to_location = (string) ($leg['to'] ?? '');
-                        $legModel->carrier_id = $leg['carrierId'] ?? null;
+                        $legCarrierId = $leg['carrierId'] ?? null;
+                        $this->assertPartyOfType($companyId, $legCarrierId, ['carrier'], 'leg carrier');
+                        $legModel->carrier_id = $legCarrierId;
                         $legModel->vessel = isset($leg['vessel']) ? trim((string) $leg['vessel']) : null;
                         $legModel->planned_dep = $leg['plannedDep'] ?? null;
                         $legModel->planned_arr = $leg['plannedArr'] ?? null;
@@ -197,6 +208,30 @@ final class CreateShipment
 
             return $this->toArray($shipment);
         });
+    }
+
+    /**
+     * @param  list<string>  $allowedTypes
+     */
+    private function assertPartyOfType(string $companyId, mixed $partyId, array $allowedTypes, string $role): void
+    {
+        if ($partyId === null || $partyId === '') {
+            return;
+        }
+
+        $party = Party::query()
+            ->where('company_id', $companyId)
+            ->where('id', (string) $partyId)
+            ->first();
+
+        if ($party === null) {
+            throw new NotFoundException(ucfirst($role)." party {$partyId} not found.");
+        }
+
+        if (! in_array($party->party_type, $allowedTypes, true)) {
+            $allowed = implode(' or ', $allowedTypes);
+            throw new BusinessRuleException(ucfirst($role)." must be a {$allowed} party.");
+        }
     }
 
     private function nextNumber(string $companyId, string $docType, string $prefix, string $year): string

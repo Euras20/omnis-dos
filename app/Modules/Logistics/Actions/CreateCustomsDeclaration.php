@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Logistics\Actions;
 
+use App\Exceptions\BusinessRuleException;
 use App\Exceptions\NotFoundException;
 use App\Models\CustomsDeclaration;
 use App\Models\NumberSequence;
+use App\Models\Party;
 use App\Models\Shipment;
 use App\Shared\Audit\AuditWriter;
 use App\Shared\Company\CompanyContext;
@@ -83,7 +85,7 @@ final class CreateCustomsDeclaration
             $decl->shipment_id = $shipmentId;
             $decl->consignment_id = $data['consignmentId'] ?? null;
             $decl->jurisdiction = $data['jurisdiction'] ?? null;
-            $decl->broker_id = $data['brokerId'] ?? null;
+            $decl->broker_id = $brokerId;
             $decl->hs_code = $data['hsCode'] ?? null;
             $decl->valuation = $data['valuation'] ?? null;
             $decl->duties_minor = (int) ($data['dutiesMinor'] ?? 0);

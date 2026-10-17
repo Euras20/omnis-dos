@@ -28,6 +28,8 @@ final class EmployeeController extends Controller
                 'basicMinor' => (int) $e->basic_minor,
                 'department' => $e->department,
                 'jobTitle' => $e->job_title,
+                'level' => $e->level,
+                'isResident' => (bool) $e->is_resident,
                 'isActive' => (bool) $e->is_active,
             ]);
 

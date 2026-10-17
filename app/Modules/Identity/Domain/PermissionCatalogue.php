@@ -85,6 +85,9 @@ final class PermissionCatalogue
             self::entry('fx.manage', 'Finance', 'Exchange rates', 'Manage', 'Manage FX rates', false),
             self::entry('tax.manage', 'Finance', 'Tax rules', 'Manage', 'Manage tax and WHT rules', true),
             self::entry('period.close', 'Finance', 'Period close', 'Close', 'Close accounting periods', true),
+            self::entry('close.manage', 'Finance', 'Period close', 'Manage', 'Waive, lock and reopen accounting periods', true),
+            self::entry('calendars.view', 'Settings', 'Calendars', 'View', 'View company calendars and tax filing calendar', false),
+            self::entry('calendars.manage', 'Settings', 'Calendars', 'Manage', 'Update working days, shifts and holidays', true),
 
             // Reports
             self::entry('reports.financial', 'Reports', 'Financial reports', 'View', 'View financial reports and ledger', false),
@@ -95,6 +98,14 @@ final class PermissionCatalogue
             // Payroll
             self::entry('payroll.manage', 'Payroll', 'Payroll runs', 'Prepare', 'Prepare payroll runs', true),
             self::entry('payroll.approve', 'Payroll', 'Payroll runs', 'Approve', 'Approve and post payroll', true),
+
+            // People / Leave
+            self::entry('people.leave.request', 'People', 'Leave', 'Request', 'Request own leave', false),
+            self::entry('people.leave.approve', 'People', 'Leave', 'Approve', 'Approve or reject leave requests', true),
+
+            // Quality
+            self::entry('quality.view', 'Quality', 'Nonconformances and CAPA', 'View', 'View nonconformances and corrective actions', false),
+            self::entry('quality.manage', 'Quality', 'Nonconformances and CAPA', 'Manage', 'Create nonconformances, reject from quarantine, send to corrective action', true),
 
             // Portals
             self::entry('portal.customer', 'Portals', 'Customer portal', 'Access', 'Access customer portal', false),

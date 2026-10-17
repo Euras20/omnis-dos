@@ -31,6 +31,7 @@ class PayrollLine extends Model
             'ssf_employee_minor' => 'integer',
             'ssf_employer_minor' => 'integer',
             'paye_minor' => 'integer',
+            'ot_tax_minor' => 'integer',
             'other_deductions_minor' => 'integer',
             'net_minor' => 'integer',
             'is_frozen' => 'boolean',

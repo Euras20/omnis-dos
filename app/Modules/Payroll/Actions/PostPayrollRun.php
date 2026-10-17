@@ -79,12 +79,13 @@ final class PostPayrollRun
                     memo: 'Employer SSF '.$run->period_month,
                 );
             }
-            // Cr PAYE
-            if ((int) $run->paye_minor > 0) {
+            // Cr PAYE (includes junior overtime tax)
+            $payeTotal = (int) $run->paye_minor + (int) $run->ot_tax_total_minor;
+            if ($payeTotal > 0) {
                 $lines[] = new PostingLine(
                     accountId: $accounts['paye'],
                     debitMinor: 0,
-                    creditMinor: (int) $run->paye_minor,
+                    creditMinor: $payeTotal,
                     memo: 'PAYE '.$run->period_month,
                 );
             }

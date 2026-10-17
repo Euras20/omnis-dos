@@ -51,6 +51,10 @@ final class ApprovePayrollRun
             if ($run->prepared_by !== null && $run->prepared_by === $actorId) {
                 throw new BusinessRuleException('Approver must differ from preparer (SoD).');
             }
+            $exceptions = $run->exceptions ?? [];
+            if (is_array($exceptions) && $exceptions !== []) {
+                throw new BusinessRuleException('Payroll has unresolved exceptions. Resolve overtime first.');
+            }
 
             PayrollLine::query()
                 ->where('payroll_run_id', $runId)

@@ -29,18 +29,28 @@ use App\Http\Controllers\Procurement\RequisitionController;
 use App\Http\Controllers\Procurement\RfqController;
 use App\Http\Controllers\Receivables\InvoiceController;
 use App\Http\Controllers\Receivables\ReceiptController;
+use App\Http\Controllers\Sales\FinanceSalesController;
+use App\Http\Controllers\Ledger\PeriodCloseController;
 use App\Http\Controllers\Sales\QuotationController;
 use App\Http\Controllers\Sales\SalesOrderController;
 use App\Http\Controllers\Payroll\EmployeeController;
+use App\Http\Controllers\Payroll\LeaveController;
 use App\Http\Controllers\Payroll\PayrollRunController;
 use App\Http\Controllers\Assets\AssetController;
 use App\Http\Controllers\Platform\ImportController;
 use App\Http\Controllers\Treasury\BankImportController;
+use App\Http\Controllers\Treasury\BankLineController;
+use App\Http\Controllers\Treasury\BankReconciliationController;
+use App\Http\Controllers\Platform\CalendarController;
+use App\Http\Controllers\Platform\DocumentController;
+use App\Http\Controllers\Platform\ImportController;
 use App\Http\Controllers\Treasury\ExpenseController;
 use App\Http\Controllers\Treasury\TransferController;
 use App\Http\Controllers\Logistics\CustomsController;
 use App\Http\Controllers\Logistics\LogisticsSupportController;
-use App\Http\Controllers\Logistics\ShipmentController;
+use App\Http\Controllers\Quality\QualityController;
+use App\Http\Controllers\Reporting\ReportController;
+use App\Http\Controllers\Tax\GhanaTaxController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -107,6 +117,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/order-types', [OrderTypeController::class, 'index']);
         Route::get('/tax/rules', [TaxRuleController::class, 'index']);
         Route::get('/tax/wht', [TaxRuleController::class, 'wht']);
+        Route::get('/tax/ghana', [GhanaTaxController::class, 'show']);
         Route::get('/fx/rates', [FxRateController::class, 'index']);
         Route::get('/document-templates', [DocumentTemplateController::class, 'index']);
         Route::get('/document-templates/{type}', [DocumentTemplateController::class, 'show']);
@@ -152,6 +163,32 @@ Route::prefix('v1')->group(function () {
         Route::get('/sales-orders', [SalesOrderController::class, 'index']);
         Route::get('/sales-orders/{id}', [SalesOrderController::class, 'show']);
 
+        // --- Finance sales workspace ---
+        Route::get('/finance/sales-summary', [FinanceSalesController::class, 'summary']);
+        Route::get('/finance/sales-activity', [FinanceSalesController::class, 'activity']);
+
+        // --- Period close ---
+        Route::get('/close/{month}', [PeriodCloseController::class, 'show']);
+
+        // --- Reports (16.8 + 16.9) ---
+        Route::get('/reports', [ReportController::class, 'index']);
+        Route::get('/reports/saved', [ReportController::class, 'saved']);
+        Route::get('/reports/favourites', [ReportController::class, 'favourites']);
+        Route::get('/reports/trial-balance', [ReportController::class, 'trialBalance']);
+        Route::get('/reports/general-ledger', [ReportController::class, 'generalLedger']);
+        Route::get('/reports/stock', [ReportController::class, 'stock']);
+        Route::get('/reports/logistics', [ReportController::class, 'logistics']);
+        Route::get('/reports/management', [ReportController::class, 'management']);
+        Route::get('/reports/performance', [ReportController::class, 'performance']);
+        Route::get('/reports/{key}', [ReportController::class, 'show']);
+
+        // --- Calendars + tax filing calendar (16.9) ---
+        Route::get('/calendars', [CalendarController::class, 'show']);
+        Route::get('/tax/filings', [CalendarController::class, 'filings']);
+
+        // --- Pricing calculator (16.3) ---
+        Route::get('/pricing/parameters', [PricingController::class, 'parameters']);
+
         // --- Procurement: queries ---
         Route::get('/purchase-orders', [PurchaseOrderController::class, 'index']);
         Route::get('/purchase-orders/{id}', [PurchaseOrderController::class, 'show']);
@@ -167,6 +204,10 @@ Route::prefix('v1')->group(function () {
 
         // --- Payroll: queries ---
         Route::get('/employees', [EmployeeController::class, 'index']);
+        Route::get('/leave/me', [LeaveController::class, 'me']);
+        Route::get('/leave', [LeaveController::class, 'index']);
+        Route::get('/quality/nonconformances', [QualityController::class, 'nonconformances']);
+        Route::get('/quality/corrective-actions', [QualityController::class, 'correctiveActions']);
         Route::get('/payroll/runs', [PayrollRunController::class, 'index']);
         Route::get('/payroll/runs/{id}', [PayrollRunController::class, 'show']);
 
@@ -180,6 +221,10 @@ Route::prefix('v1')->group(function () {
 
         // --- Treasury: queries ---
         Route::get('/bank/imports', [BankImportController::class, 'index']);
+        Route::get('/bank/lines', [BankLineController::class, 'index']);
+        Route::get('/bank/lines/{id}/candidates', [BankLineController::class, 'candidates']);
+        Route::get('/bank/reconciliation', [BankReconciliationController::class, 'workbench']);
+        Route::get('/bank/reconciliations', [BankReconciliationController::class, 'index']);
         Route::get('/expenses', [ExpenseController::class, 'index']);
 
         // State-changing commands also require Idempotency-Key.
@@ -215,6 +260,7 @@ Route::prefix('v1')->group(function () {
             Route::patch('/order-types/{id}', [OrderTypeController::class, 'update']);
 
             Route::post('/tax/rules', [TaxRuleController::class, 'store']);
+            Route::post('/tax/ghana', [GhanaTaxController::class, 'store']);
             Route::put('/fx/rates/{date}', [FxRateController::class, 'upsert']);
             Route::post('/fx/rates/fetch-xe', [FxRateController::class, 'fetchXe']);
 
@@ -271,6 +317,14 @@ Route::prefix('v1')->group(function () {
             Route::post('/sales-orders', [SalesOrderController::class, 'store']);
             Route::post('/sales-orders/{id}/confirm', [SalesOrderController::class, 'confirm']);
 
+            // --- Period close: commands ---
+            Route::post('/close/{month}/waivers', [PeriodCloseController::class, 'waive']);
+            Route::post('/close/{month}/lock', [PeriodCloseController::class, 'lock']);
+            Route::post('/close/{month}/reopen', [PeriodCloseController::class, 'reopen']);
+
+            Route::put('/pricing/parameters', [PricingController::class, 'updateParameters']);
+            Route::post('/pricing/calculate', [PricingController::class, 'calculate']);
+
             // --- Procurement: commands ---
             Route::post('/purchase-orders', [PurchaseOrderController::class, 'store']);
             Route::post('/purchase-orders/{id}/approve', [PurchaseOrderController::class, 'approve']);
@@ -288,7 +342,17 @@ Route::prefix('v1')->group(function () {
 
             // --- Payroll: commands ---
             Route::post('/employees', [EmployeeController::class, 'store']);
+            Route::post('/leave', [LeaveController::class, 'store']);
+            Route::post('/leave/{id}/approve', [LeaveController::class, 'approve']);
+            Route::post('/leave/{id}/reject', [LeaveController::class, 'reject']);
+
+            // --- Quality: commands ---
+            Route::post('/quality/nonconformances', [QualityController::class, 'storeNonconformance']);
+            Route::post('/quality/nonconformances/{id}/send-to-corrective-action', [QualityController::class, 'sendToCorrectiveAction']);
+            Route::post('/quality/nonconformances/{id}/close', [QualityController::class, 'closeNonconformance']);
+            Route::post('/quality/quarantine/reject', [QualityController::class, 'rejectQuarantine']);
             Route::post('/payroll/runs', [PayrollRunController::class, 'store']);
+            Route::post('/payroll/runs/{id}/cap-overtime', [PayrollRunController::class, 'capOvertime']);
             Route::post('/payroll/runs/{id}/approve', [PayrollRunController::class, 'approve']);
             Route::post('/payroll/runs/{id}/post', [PayrollRunController::class, 'post']);
             Route::post('/payroll/runs/{id}/pay', [PayrollRunController::class, 'pay']);
@@ -300,8 +364,22 @@ Route::prefix('v1')->group(function () {
             // --- Treasury: commands ---
             Route::post('/imports/{type}', [ImportController::class, 'store']);
             Route::post("/bank/imports", [BankImportController::class, "store"]);
+            Route::post('/bank/lines/{id}/match', [BankLineController::class, 'match']);
+            Route::post('/bank/lines/{id}/exclude', [BankLineController::class, 'exclude']);
+            Route::post('/bank/lines/{id}/unmatch', [BankLineController::class, 'unmatch']);
+            Route::post('/bank/reconciliations', [BankReconciliationController::class, 'store']);
+            Route::post('/bank/reconciliations/{id}/approve', [BankReconciliationController::class, 'approve']);
             Route::post('/expenses', [ExpenseController::class, 'store']);
             Route::post('/transfers', [TransferController::class, 'store']);
+
+            // --- Calendars + reports (16.9) ---
+            Route::put('/calendars', [CalendarController::class, 'update']);
+            Route::post('/calendars/holidays', [CalendarController::class, 'storeHoliday']);
+            Route::delete('/calendars/holidays/{id}', [CalendarController::class, 'destroyHoliday']);
+            Route::post('/tax/filings/{id}/record', [CalendarController::class, 'recordFiling']);
+            Route::post('/reports/saved', [ReportController::class, 'storeSaved']);
+            Route::delete('/reports/saved/{id}', [ReportController::class, 'destroySaved']);
+            Route::post('/reports/favourites', [ReportController::class, 'toggleFavourite']);
         });
     });
 });
