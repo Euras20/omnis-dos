@@ -16,6 +16,7 @@ use App\Http\Controllers\Identity\Admin\PermissionController;
 use App\Http\Controllers\Identity\Admin\RoleController;
 use App\Http\Controllers\Identity\Admin\UserController;
 use App\Http\Controllers\Identity\MeController;
+use App\Http\Controllers\Identity\SignatureController;
 use App\Http\Controllers\Ledger\AccountController;
 use App\Http\Controllers\Ledger\JournalController;
 use App\Http\Controllers\Inventory\DeliveryController;
@@ -92,6 +93,8 @@ Route::prefix('v1')->group(function () {
 
         // --- Identity: session ---
         Route::get('/me', MeController::class);
+        Route::get('/me/signature', [SignatureController::class, 'show']);
+        Route::get('/users/{id}/signature', [SignatureController::class, 'showForUser']);
 
         // --- System alerts (internal users only; empty for portal) ---
         Route::get('/alerts', [AlertsController::class, 'index']);
@@ -231,6 +234,8 @@ Route::prefix('v1')->group(function () {
         // State-changing commands also require Idempotency-Key.
         Route::middleware(['omnis.idempotency'])->group(function () {
             // --- Identity: administration (commands) ---
+            Route::post('/me/signature', [SignatureController::class, 'store']);
+            Route::delete('/me/signature', [SignatureController::class, 'destroy']);
             Route::post('/admin/roles', [RoleController::class, 'store']);
             Route::put('/admin/roles/{code}', [RoleController::class, 'update']);
             Route::delete('/admin/roles/{code}', [RoleController::class, 'destroy']);
