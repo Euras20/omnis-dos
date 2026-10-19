@@ -7002,6 +7002,104 @@
           }
         }
       }
+    },
+    "/me/signature": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Get current user's signature image",
+        "operationId": "getMySignature",
+        "responses": {
+          "200": {
+            "description": "Image"
+          },
+          "404": {
+            "description": "No signature"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Upload current user's signature image",
+        "operationId": "uploadMySignature",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Uploaded"
+          },
+          "422": {
+            "description": "Invalid file"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Remove current user's signature",
+        "operationId": "deleteMySignature",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed"
+          }
+        }
+      }
+    },
+    "/users/{id}/signature": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Get a user's signature image (for document print)",
+        "operationId": "getUserSignature",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image"
+          },
+          "404": {
+            "description": "No signature"
+          }
+        }
+      }
     }
   },
   "components": {

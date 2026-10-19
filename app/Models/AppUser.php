@@ -45,6 +45,7 @@ class AppUser extends Model
         'is_active',
         'phone',
         'job_title',
+        'signature_path',
         'created_by',
         'last_seen_at',
         'deactivated_at',

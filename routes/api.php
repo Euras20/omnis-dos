@@ -16,6 +16,7 @@ use App\Http\Controllers\Identity\Admin\PermissionController;
 use App\Http\Controllers\Identity\Admin\RoleController;
 use App\Http\Controllers\Identity\Admin\UserController;
 use App\Http\Controllers\Identity\MeController;
+use App\Http\Controllers\Identity\SignatureController;
 use App\Http\Controllers\Ledger\AccountController;
 use App\Http\Controllers\Ledger\JournalController;
 use App\Http\Controllers\Inventory\DeliveryController;
@@ -32,6 +33,7 @@ use App\Http\Controllers\Receivables\ReceiptController;
 use App\Http\Controllers\Sales\FinanceSalesController;
 use App\Http\Controllers\Ledger\PeriodCloseController;
 use App\Http\Controllers\Sales\QuotationController;
+use App\Http\Controllers\Sales\PricingController;
 use App\Http\Controllers\Sales\SalesOrderController;
 use App\Http\Controllers\Payroll\EmployeeController;
 use App\Http\Controllers\Payroll\LeaveController;
@@ -47,6 +49,7 @@ use App\Http\Controllers\Treasury\ExpenseController;
 use App\Http\Controllers\Treasury\TransferController;
 use App\Http\Controllers\Logistics\CustomsController;
 use App\Http\Controllers\Logistics\LogisticsSupportController;
+use App\Http\Controllers\Logistics\ShipmentController;
 use App\Http\Controllers\Quality\QualityController;
 use App\Http\Controllers\Reporting\ReportController;
 use App\Http\Controllers\Tax\GhanaTaxController;
@@ -90,6 +93,8 @@ Route::prefix('v1')->group(function () {
 
         // --- Identity: session ---
         Route::get('/me', MeController::class);
+        Route::get('/me/signature', [SignatureController::class, 'show']);
+        Route::get('/users/{id}/signature', [SignatureController::class, 'showForUser']);
 
         // --- System alerts (internal users only; empty for portal) ---
         Route::get('/alerts', [AlertsController::class, 'index']);
@@ -229,6 +234,8 @@ Route::prefix('v1')->group(function () {
         // State-changing commands also require Idempotency-Key.
         Route::middleware(['omnis.idempotency'])->group(function () {
             // --- Identity: administration (commands) ---
+            Route::post('/me/signature', [SignatureController::class, 'store']);
+            Route::delete('/me/signature', [SignatureController::class, 'destroy']);
             Route::post('/admin/roles', [RoleController::class, 'store']);
             Route::put('/admin/roles/{code}', [RoleController::class, 'update']);
             Route::delete('/admin/roles/{code}', [RoleController::class, 'destroy']);

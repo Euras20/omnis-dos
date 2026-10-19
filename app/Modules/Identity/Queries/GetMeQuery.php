@@ -74,6 +74,7 @@ final class GetMeQuery
             'jobTitle' => $user->job_title,
             'phone' => $user->phone,
             'isActive' => (bool) $user->is_active,
+            'hasSignature' => $user->signature_path !== null,
             'company' => $company === null ? null : [
                 'id' => (string) $company->id,
                 'code' => $company->code,
