@@ -12,6 +12,7 @@ use App\Modules\Reporting\Actions\ToggleFavourite;
 use App\Modules\Reporting\Queries\GeneralLedgerQuery;
 use App\Modules\Reporting\Queries\ListFavouritesQuery;
 use App\Modules\Reporting\Queries\ListSavedReportsQuery;
+use App\Modules\Reporting\Queries\OverviewQuery;
 use App\Modules\Reporting\Queries\ReportCatalogueQuery;
 use App\Modules\Reporting\Queries\ReportStubQuery;
 use App\Modules\Reporting\Queries\TrialBalanceQuery;
@@ -52,6 +53,16 @@ final class ReportController
             'to' => $request->query('to'),
             'account' => $request->query('account') ?? $request->query('acct'),
             'currency' => $request->query('currency') ?? $request->query('cur'),
+        ]));
+    }
+
+    /**
+     * GET /api/v1/overview — executive overview (first page after login).
+     */
+    public function overview(Request $request, OverviewQuery $query): JsonResponse
+    {
+        return response()->json($query->execute([
+            'asOf' => $request->query('asOf') ?? $request->query('asof'),
         ]));
     }
 

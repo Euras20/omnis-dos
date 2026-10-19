@@ -174,6 +174,9 @@ Route::prefix('v1')->group(function () {
         // --- Period close ---
         Route::get('/close/{month}', [PeriodCloseController::class, 'show']);
 
+        // --- Overview (executive dashboard, first page after login) ---
+        Route::get('/overview', [ReportController::class, 'overview']);
+
         // --- Reports (16.8 + 16.9) ---
         Route::get('/reports', [ReportController::class, 'index']);
         Route::get('/reports/saved', [ReportController::class, 'saved']);
