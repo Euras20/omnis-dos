@@ -31,7 +31,6 @@ final class GetGhanaTaxPackageQuery
             'vat' => 15.0,
             'nhil' => 2.5,
             'getfund' => 2.5,
-            'covid' => 0.0,
             'vatThresholdMinor' => 75_000_000,
             'law' => 'Value Added Tax Act, 2025 (Act 1151)',
             'paye' => [
