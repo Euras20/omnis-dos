@@ -108,7 +108,7 @@ final class UpsertGhanaTaxPackage
                 $package[$key] = $raw[$key];
             }
         }
-        foreach (['vat', 'nhil', 'getfund', 'covid', 'nonResident', 'ssnitMin', 'ssnitMax', 'ssnitEmp', 'ssnitEr', 'tier1', 'tier2', 'otJunior1', 'otJunior2', 'otCapPctBasic', 'bonusRate', 'bonusCapPctAnnual', 'cit'] as $key) {
+        foreach (['vat', 'nhil', 'getfund', 'nonResident', 'ssnitMin', 'ssnitMax', 'ssnitEmp', 'ssnitEr', 'tier1', 'tier2', 'otJunior1', 'otJunior2', 'otCapPctBasic', 'bonusRate', 'bonusCapPctAnnual', 'cit'] as $key) {
             if (isset($raw[$key]) && is_numeric($raw[$key])) {
                 $package[$key] = (float) $raw[$key];
             }
