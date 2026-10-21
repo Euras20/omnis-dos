@@ -119,6 +119,7 @@ class AppUser extends Model
             'is_active' => (bool) ($data['is_active'] ?? true),
             'phone' => isset($data['phone']) ? (string) $data['phone'] : null,
             'job_title' => isset($data['job_title']) ? (string) $data['job_title'] : null,
+            'signature_path' => isset($data['signature_path']) ? (string) $data['signature_path'] : null,
         ]);
         $model->exists = true;
         $model->syncOriginal();
