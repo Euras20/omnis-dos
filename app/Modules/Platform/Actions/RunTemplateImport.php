@@ -95,8 +95,16 @@ final class RunTemplateImport
             foreach ($def['columns'] as $col) {
                 $idx = $index[$col['name']] ?? null;
                 $value = $idx !== null ? trim((string) ($raw[$idx] ?? '')) : '';
-                $row[$col['name']] = $value;
+                $row[$col['name']] = $this->stripPlaceholder($value);
+            }
 
+            // Entirely blank or placeholder-only rows (e.g. the old template example row) are ignored.
+            if ($this->isBlankRow($row)) {
+                continue;
+            }
+
+            foreach ($def['columns'] as $col) {
+                $value = $row[$col['name']];
                 if ($col['required'] && $value === '') {
                     $errors[] = ['row' => $rowNo, 'column' => $col['name'], 'reason' => 'Required'];
                     continue;
@@ -104,10 +112,12 @@ final class RunTemplateImport
                 if ($value === '') {
                     continue;
                 }
-
                 $reason = $this->checkType($col['type'], $value);
                 if ($reason !== null) {
                     $errors[] = ['row' => $rowNo, 'column' => $col['name'], 'reason' => $reason];
+                }
+                if ($col['name'] === 'currency' && preg_match('/^[A-Za-z]{3}$/', $value) !== 1) {
+                    $errors[] = ['row' => $rowNo, 'column' => 'currency', 'reason' => 'Must be a 3-letter ISO code (e.g. GHS)'];
                 }
             }
 
@@ -130,6 +140,13 @@ final class RunTemplateImport
             throw ValidationException::fromFields(
                 ['rows' => $errors],
                 'Import rejected. '.count($errors).' error(s). Nothing was imported.',
+            );
+        }
+
+        if ($parsed === []) {
+            throw new ValidationException(
+                'No data rows found. Placeholder values such as "Optional" and "Default GHS" are ignored.',
+                ['csv' => ['No data rows']],
             );
         }
 
@@ -290,7 +307,7 @@ final class RunTemplateImport
                     'phone' => $r['phone'] ?: null,
                     'payment_terms' => $r['payment_terms'] ?: null,
                     'credit_limit_minor' => $r['credit_limit'] !== '' ? $this->money($r['credit_limit']) : null,
-                    'currency' => $r['currency'] ?: 'GHS',
+                    'currency' => $this->currency($r['currency']),
                     'vat_registered' => $this->bool($r['vat_registered'], false),
                     'is_active' => $this->bool($r['is_active'], true),
                 ]),
@@ -301,7 +318,7 @@ final class RunTemplateImport
                     'name' => $r['name'],
                     'category' => $r['category'],
                     'kind' => $r['kind'] ?: 'detail',
-                    'currency' => $r['currency'] ?: null,
+                    'currency' => $r['currency'] !== '' ? $this->currency($r['currency']) : null,
                     'fs_line_item' => $r['fs_line_item'] ?: null,
                     'fs_sub_line' => $r['fs_sub_line'] ?: null,
                     'normal_balance' => $r['normal_balance'] ?: 'debit',
@@ -350,7 +367,7 @@ final class RunTemplateImport
             'customer_id' => $partyByCode[$r['customer_code']],
             'invoice_date' => $r['invoice_date'],
             'due_date' => $r['due_date'] ?: null,
-            'currency' => $r['currency'] ?: 'GHS',
+            'currency' => $this->currency($r['currency']),
             'net_minor' => $net,
             'vat_minor' => $tax,
             'tax_total_minor' => $tax,
@@ -389,7 +406,7 @@ final class RunTemplateImport
             'supplier_ref' => $r['supplier_ref'] ?: null,
             'bill_date' => $r['bill_date'],
             'due_date' => $r['due_date'] ?: null,
-            'currency' => $r['currency'] ?: 'GHS',
+            'currency' => $this->currency($r['currency']),
             'net_minor' => $this->money($r['net']),
             'tax_minor' => $this->money($r['tax']),
             'gross_minor' => $this->money($r['gross']),
@@ -424,6 +441,46 @@ final class RunTemplateImport
             'status' => 'unmatched',
             'line_hash' => $lineHash,
         ]);
+    }
+
+    /**
+     * Treat template hint text and other non-values as empty so they are never stored.
+     */
+    private function stripPlaceholder(string $value): string
+    {
+        if ($value === '') {
+            return '';
+        }
+        $lower = strtolower($value);
+        if (in_array($lower, ['optional', 'default', 'default ghs', 'default true', 'default false', 'n/a', 'na', '-'], true)) {
+            return '';
+        }
+        if (str_starts_with($lower, 'default ')) {
+            return '';
+        }
+        return $value;
+    }
+
+    /**
+     * @param  array<string, string>  $row
+     */
+    private function isBlankRow(array $row): bool
+    {
+        foreach ($row as $v) {
+            if (trim((string) $v) !== '') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * ISO 4217 code, or GHS when blank / invalid. Callers have already validated.
+     */
+    private function currency(string $value): string
+    {
+        $value = strtoupper(trim($value));
+        return preg_match('/^[A-Z]{3}$/', $value) === 1 ? $value : 'GHS';
     }
 
     private function checkType(string $type, string $value): ?string
