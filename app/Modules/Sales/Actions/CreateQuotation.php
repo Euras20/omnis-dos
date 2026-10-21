@@ -76,7 +76,7 @@ final class CreateQuotation
         $memo = isset($data['memo']) ? trim((string) $data['memo']) : null;
         $requestId = $this->companyContext->requestId();
         $taxRates = $this->resolveTaxRates($companyId, $quotationDate);
-        $combinedTaxRate = $taxRates['vat'] + $taxRates['nhil'] + $taxRates['getfund'] + $taxRates['covid'];
+        $combinedTaxRate = $taxRates['vat'] + $taxRates['nhil'] + $taxRates['getfund'];
 
         return DB::transaction(function () use (
             $companyId,
@@ -215,11 +215,11 @@ final class CreateQuotation
     }
 
     /**
-     * @return array{vat: float, nhil: float, getfund: float, covid: float}
+     * @return array{vat: float, nhil: float, getfund: float}
      */
     private function resolveTaxRates(string $companyId, string $date): array
     {
-        $defaults = ['vat' => 0.15, 'nhil' => 0.025, 'getfund' => 0.025, 'covid' => 0.01];
+        $defaults = ['vat' => 0.15, 'nhil' => 0.025, 'getfund' => 0.025];
         $rule = TaxRuleVersion::query()
             ->where('company_id', $companyId)
             ->where('effective_from', '<=', $date)
@@ -234,17 +234,19 @@ final class CreateQuotation
         $components = is_array($rule->components) ? $rule->components : [];
         $pick = static function (array $c, string $key, float $fallback): float {
             if (isset($c[$key]) && is_numeric($c[$key])) {
-                return (float) $c[$key];
+                $v = (float) $c[$key];
+
+                return $v > 1 ? $v / 100.0 : $v;
             }
 
             return $fallback;
         };
 
+        // COVID levy is no longer applicable. Omit it from the snapshot.
         return [
             'vat' => $pick($components, 'vat', $defaults['vat']),
             'nhil' => $pick($components, 'nhil', $defaults['nhil']),
             'getfund' => $pick($components, 'getfund', $defaults['getfund']),
-            'covid' => $pick($components, 'covid', $defaults['covid']),
         ];
     }
 
