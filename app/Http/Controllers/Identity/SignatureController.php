@@ -29,10 +29,7 @@ final class SignatureController
 
     public function show(Request $request): StreamedResponse
     {
-        /** @var AppUser $user */
-        $user = $request->user();
-
-        return $this->stream($user);
+        return $this->stream($this->fresh($request));
     }
 
     public function showForUser(string $id): StreamedResponse
@@ -47,11 +44,25 @@ final class SignatureController
 
     public function destroy(Request $request, DeleteSignature $action): JsonResponse
     {
-        /** @var AppUser $user */
-        $user = $request->user();
-        $action->execute($user);
+        $action->execute($this->fresh($request));
 
         return response()->json(['hasSignature' => false]);
+    }
+
+    /**
+     * The auth principal is hydrated without every column. Reload so signature_path is current.
+     */
+    private function fresh(Request $request): AppUser
+    {
+        /** @var AppUser $principal */
+        $principal = $request->user();
+
+        $user = AppUser::query()->find($principal->id);
+        if (! $user) {
+            throw new NotFoundException('User not found.');
+        }
+
+        return $user;
     }
 
     private function stream(AppUser $user): StreamedResponse
