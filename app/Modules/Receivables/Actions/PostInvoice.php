@@ -354,7 +354,7 @@ final class PostInvoice
     }
 
     /**
-     * @return array{vat: float, nhil: float, getfund: float, covid: float}
+     * @return array{vat: float, nhil: float, getfund: float}
      */
     private function resolveTaxRates(string $companyId, string $invoiceDate): array
     {
@@ -365,7 +365,7 @@ final class PostInvoice
             ->orderByDesc('effective_from')
             ->first();
 
-        $defaults = ['vat' => 0.15, 'nhil' => 0.025, 'getfund' => 0.025, 'covid' => 0.01];
+        $defaults = ['vat' => 0.15, 'nhil' => 0.025, 'getfund' => 0.025];
         if ($rule === null) {
             return $defaults;
         }
@@ -380,11 +380,11 @@ final class PostInvoice
             return $v > 1 ? $v / 100.0 : $v;
         };
 
+        // COVID levy is no longer applicable. Omit it from the snapshot.
         return [
             'vat' => $pick($components, 'vat', $defaults['vat']),
             'nhil' => $pick($components, 'nhil', $defaults['nhil']),
             'getfund' => $pick($components, 'getfund', $defaults['getfund']),
-            'covid' => $pick($components, 'covid', $defaults['covid']),
         ];
     }
 
