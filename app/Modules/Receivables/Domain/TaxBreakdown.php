@@ -39,7 +39,7 @@ final class TaxBreakdown
         $vatRate = (float) ($rates['vat'] ?? 0.15);
         $nhilRate = (float) ($rates['nhil'] ?? 0.025);
         $getfundRate = (float) ($rates['getfund'] ?? 0.025);
-        $covidRate = (float) ($rates['covid'] ?? 0.01);
+        $covidRate = (float) ($rates['covid'] ?? 0.0);
 
         return new self(
             netMinor: $netMinor,

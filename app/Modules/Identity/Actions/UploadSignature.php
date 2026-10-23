@@ -54,8 +54,11 @@ final class UploadSignature
 
         Storage::disk('local')->put($path, $file->getContent());
 
+        // Persist by id. The auth principal is a hydrated row and may omit columns.
+        AppUser::query()->where('id', $user->id)->update([
+            'signature_path' => $path,
+        ]);
         $user->signature_path = $path;
-        $user->save();
 
         $this->auditWriter->write(
             action: 'signature.uploaded',

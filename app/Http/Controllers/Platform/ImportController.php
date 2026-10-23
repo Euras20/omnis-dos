@@ -41,8 +41,10 @@ final class ImportController extends Controller
         }
 
         $headers = array_column($def['columns'], 'name');
-        $example = array_map(fn ($c) => $c['hint'], $def['columns']);
-        $csv = implode(',', $headers)."\n".implode(',', array_map(fn ($v) => '"'.str_replace('"', '""', $v).'"', $example))."\n";
+        // Blank data row only. Hints live in the JSON template list, not in the CSV,
+        // so a user who downloads and re-uploads the template cannot insert the hint text.
+        $blank = array_fill(0, count($headers), '');
+        $csv = implode(',', $headers)."\n".implode(',', $blank)."\n";
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv; charset=utf-8',
