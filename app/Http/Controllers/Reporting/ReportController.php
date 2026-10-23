@@ -12,7 +12,9 @@ use App\Modules\Reporting\Actions\ToggleFavourite;
 use App\Modules\Reporting\Queries\GeneralLedgerQuery;
 use App\Modules\Reporting\Queries\ListFavouritesQuery;
 use App\Modules\Reporting\Queries\ListSavedReportsQuery;
+use App\Modules\Reporting\Queries\DocumentPrintQuery;
 use App\Modules\Reporting\Queries\OverviewQuery;
+use App\Modules\Reporting\Queries\QuotationConversionQuery;
 use App\Modules\Reporting\Queries\ReportCatalogueQuery;
 use App\Modules\Reporting\Queries\ReportStubQuery;
 use App\Modules\Reporting\Queries\TrialBalanceQuery;
@@ -64,6 +66,19 @@ final class ReportController
         return response()->json($query->execute([
             'asOf' => $request->query('asOf') ?? $request->query('asof'),
         ]));
+    }
+
+    public function quotations(Request $request, QuotationConversionQuery $query): JsonResponse
+    {
+        return response()->json($query->execute([
+            'from' => $request->query('from'),
+            'to' => $request->query('to'),
+        ]));
+    }
+
+    public function invoicePrint(string $id, DocumentPrintQuery $query): JsonResponse
+    {
+        return response()->json($query->invoice($id));
     }
 
     /**

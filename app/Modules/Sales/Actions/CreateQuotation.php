@@ -12,6 +12,7 @@ use App\Models\Party;
 use App\Models\Quotation;
 use App\Models\QuotationLine;
 use App\Models\TaxRuleVersion;
+use App\Modules\Sales\Domain\DeliveryType;
 use App\Modules\Sales\Domain\QuotationStatus;
 use App\Shared\Audit\AuditWriter;
 use App\Shared\Company\CompanyContext;
@@ -74,6 +75,12 @@ final class CreateQuotation
         }
         $validUntil = isset($data['validUntil']) ? (string) $data['validUntil'] : null;
         $memo = isset($data['memo']) ? trim((string) $data['memo']) : null;
+        $deliveryType = DeliveryType::normalise(isset($data['deliveryType']) ? (string) $data['deliveryType'] : null);
+        if (! DeliveryType::isKnown($deliveryType)) {
+            throw new BusinessRuleException('deliveryType must be one of: '.implode(', ', DeliveryType::ALL).'.');
+        }
+        $deliveryLocation = isset($data['deliveryLocation']) ? trim((string) $data['deliveryLocation']) : null;
+        $supplierQuoteRef = isset($data['supplierQuoteRef']) ? trim((string) $data['supplierQuoteRef']) : null;
         $requestId = $this->companyContext->requestId();
         $taxRates = $this->resolveTaxRates($companyId, $quotationDate);
         $combinedTaxRate = $taxRates['vat'] + $taxRates['nhil'] + $taxRates['getfund'];
@@ -87,6 +94,9 @@ final class CreateQuotation
             $currency,
             $discountPercent,
             $memo,
+            $deliveryLocation,
+            $deliveryType,
+            $supplierQuoteRef,
             $actorId,
             $requestId,
             $combinedTaxRate,
@@ -144,6 +154,7 @@ final class CreateQuotation
                     'quotation_id' => $quotationId,
                     'line_no' => $index + 1,
                     'item_id' => $itemId ?: null,
+                    'to_order' => (bool) ($raw['toOrder'] ?? ($itemId === null || $itemId === '')),
                     'description' => $description,
                     'qty' => $qty,
                     'unit' => $unit,
@@ -174,6 +185,9 @@ final class CreateQuotation
                 'gross_minor' => $discountedGross,
                 'tax_snapshot' => $taxRates,
                 'memo' => $memo,
+                'delivery_location' => $deliveryLocation !== '' ? $deliveryLocation : null,
+                'delivery_type' => $deliveryType,
+                'supplier_quote_ref' => $supplierQuoteRef !== '' ? $supplierQuoteRef : null,
                 'created_by' => $actorId,
                 'request_id' => $requestId,
             ]);
@@ -298,11 +312,15 @@ final class CreateQuotation
             'taxTotalMinor' => $quotation->tax_total_minor,
             'grossMinor' => $quotation->gross_minor,
             'memo' => $quotation->memo,
+            'deliveryLocation' => $quotation->delivery_location,
+            'deliveryType' => $quotation->delivery_type,
+            'supplierQuoteRef' => $quotation->supplier_quote_ref,
             'convertedSalesOrderId' => $quotation->converted_sales_order_id,
             'lines' => $quotation->lines->map(static fn (QuotationLine $l) => [
                 'id' => $l->id,
                 'lineNo' => $l->line_no,
                 'itemId' => $l->item_id,
+                'toOrder' => (bool) $l->to_order,
                 'description' => $l->description,
                 'qty' => (string) $l->qty,
                 'unit' => $l->unit,

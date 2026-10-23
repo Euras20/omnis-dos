@@ -302,6 +302,8 @@ final class RunTemplateImport
                     'region' => $r['region'] ?: null,
                     'country' => $r['country'] ?: null,
                     'address' => $r['address'] ?: null,
+                    'delivery_address' => $r['delivery_address'] ?: null,
+                    'delivery_terms' => $r['delivery_terms'] !== '' ? strtoupper($r['delivery_terms']) : null,
                     'contact_name' => $r['contact_name'] ?: null,
                     'email' => $r['email'] ?: null,
                     'phone' => $r['phone'] ?: null,

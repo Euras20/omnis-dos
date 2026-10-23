@@ -8,9 +8,11 @@ use App\Http\Requests\Sales\ChangeQuotationStatusRequest;
 use App\Http\Requests\Sales\ConvertQuotationRequest;
 use App\Http\Requests\Sales\StoreQuotationRequest;
 use App\Http\Requests\Sales\UpdateQuotationRequest;
+use App\Modules\Reporting\Queries\DocumentPrintQuery;
 use App\Modules\Sales\Actions\ChangeQuotationStatus;
 use App\Modules\Sales\Actions\ConvertQuotation;
 use App\Modules\Sales\Actions\CreateQuotation;
+use App\Modules\Sales\Actions\SendQuotation;
 use App\Modules\Sales\Actions\UpdateQuotation;
 use App\Modules\Sales\Queries\GetQuotationQuery;
 use App\Modules\Sales\Queries\ListQuotationsQuery;
@@ -26,6 +28,8 @@ final class QuotationController
         private readonly UpdateQuotation $updateQuotation,
         private readonly ChangeQuotationStatus $changeQuotationStatus,
         private readonly ConvertQuotation $convertQuotation,
+        private readonly SendQuotation $sendQuotation,
+        private readonly DocumentPrintQuery $printQuery,
     ) {
     }
 
@@ -73,5 +77,19 @@ final class QuotationController
         $result = $this->convertQuotation->execute($id, $request->validated());
 
         return response()->json($result, 201);
+    }
+
+    public function send(string $id, Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'to' => ['nullable', 'email', 'max:255'],
+        ]);
+
+        return response()->json($this->sendQuotation->execute($id, $data));
+    }
+
+    public function print(string $id): JsonResponse
+    {
+        return response()->json($this->printQuery->quotation($id));
     }
 }
