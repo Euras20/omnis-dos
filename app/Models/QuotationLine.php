@@ -24,6 +24,7 @@ class QuotationLine extends Model
         'quotation_id',
         'line_no',
         'item_id',
+        'to_order',
         'description',
         'qty',
         'unit',
@@ -37,6 +38,7 @@ class QuotationLine extends Model
     {
         return [
             'qty' => 'decimal:3',
+            'to_order' => 'boolean',
             'unit_price_minor' => 'integer',
             'net_minor' => 'integer',
             'tax_minor' => 'integer',

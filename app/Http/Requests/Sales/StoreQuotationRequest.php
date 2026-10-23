@@ -25,12 +25,16 @@ final class StoreQuotationRequest extends FormRequest
             'currency' => ['nullable', 'string', 'size:3'],
             'memo' => ['nullable', 'string', 'max:2000'],
             'discountPercent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'deliveryLocation' => ['nullable', 'string', 'max:255'],
+            'deliveryType' => ['nullable', 'string', 'max:16'],
+            'supplierQuoteRef' => ['nullable', 'string', 'max:255'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.description' => ['nullable', 'string', 'max:512'],
             'lines.*.qty' => ['required', 'numeric', 'gt:0'],
             'lines.*.unitPriceMinor' => ['required', 'integer', 'min:0'],
             'lines.*.itemId' => ['nullable', 'uuid'],
             'lines.*.unit' => ['nullable', 'string', 'max:32'],
+            'lines.*.toOrder' => ['nullable', 'boolean'],
         ];
     }
 }

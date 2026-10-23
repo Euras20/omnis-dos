@@ -39,6 +39,8 @@ class Party extends Model
         'region',
         'country',
         'address',
+        'delivery_address',
+        'delivery_terms',
         'gps',
         'contact_name',
         'email',

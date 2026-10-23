@@ -10,6 +10,7 @@ use App\Models\Item;
 use App\Models\Quotation;
 use App\Models\QuotationLine;
 use App\Models\TaxRuleVersion;
+use App\Modules\Sales\Domain\DeliveryType;
 use App\Modules\Sales\Domain\QuotationStatus;
 use App\Shared\Audit\AuditWriter;
 use App\Shared\Company\CompanyContext;
@@ -131,6 +132,7 @@ final class UpdateQuotation
                         'quotation_id' => $quotation->id,
                         'line_no' => $index + 1,
                         'item_id' => $itemId ?: null,
+                        'to_order' => (bool) ($raw['toOrder'] ?? ($itemId === null || $itemId === '')),
                         'description' => $description,
                         'qty' => $qty,
                         'unit' => $unit,
@@ -158,6 +160,21 @@ final class UpdateQuotation
             }
             if (array_key_exists('memo', $data)) {
                 $quotation->memo = $data['memo'] !== null ? trim((string) $data['memo']) : null;
+            }
+            if (array_key_exists('deliveryLocation', $data)) {
+                $location = $data['deliveryLocation'] !== null ? trim((string) $data['deliveryLocation']) : null;
+                $quotation->delivery_location = $location !== '' ? $location : null;
+            }
+            if (array_key_exists('deliveryType', $data)) {
+                $type = DeliveryType::normalise($data['deliveryType'] !== null ? (string) $data['deliveryType'] : null);
+                if (! DeliveryType::isKnown($type)) {
+                    throw new BusinessRuleException('deliveryType must be one of: '.implode(', ', DeliveryType::ALL).'.');
+                }
+                $quotation->delivery_type = $type;
+            }
+            if (array_key_exists('supplierQuoteRef', $data)) {
+                $ref = $data['supplierQuoteRef'] !== null ? trim((string) $data['supplierQuoteRef']) : null;
+                $quotation->supplier_quote_ref = $ref !== '' ? $ref : null;
             }
 
             $quotation->discount_percent = $discountPercent;
@@ -264,11 +281,15 @@ final class UpdateQuotation
             'taxTotalMinor' => $quotation->tax_total_minor,
             'grossMinor' => $quotation->gross_minor,
             'memo' => $quotation->memo,
+            'deliveryLocation' => $quotation->delivery_location,
+            'deliveryType' => $quotation->delivery_type,
+            'supplierQuoteRef' => $quotation->supplier_quote_ref,
             'convertedSalesOrderId' => $quotation->converted_sales_order_id,
             'lines' => $quotation->lines->map(static fn (QuotationLine $l) => [
                 'id' => $l->id,
                 'lineNo' => $l->line_no,
                 'itemId' => $l->item_id,
+                'toOrder' => (bool) $l->to_order,
                 'description' => $l->description,
                 'qty' => (string) $l->qty,
                 'unit' => $l->unit,

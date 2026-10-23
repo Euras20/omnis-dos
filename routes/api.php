@@ -39,6 +39,7 @@ use App\Http\Controllers\Payroll\EmployeeController;
 use App\Http\Controllers\Payroll\LeaveController;
 use App\Http\Controllers\Payroll\PayrollRunController;
 use App\Http\Controllers\Assets\AssetController;
+use App\Http\Controllers\Treasury\BankAccountController;
 use App\Http\Controllers\Treasury\BankImportController;
 use App\Http\Controllers\Treasury\BankLineController;
 use App\Http\Controllers\Treasury\BankReconciliationController;
@@ -164,6 +165,7 @@ Route::prefix('v1')->group(function () {
         // --- Sales: queries ---
         Route::get('/quotations', [QuotationController::class, 'index']);
         Route::get('/quotations/{id}', [QuotationController::class, 'show']);
+        Route::get('/quotations/{id}/print', [QuotationController::class, 'print']);
         Route::get('/sales-orders', [SalesOrderController::class, 'index']);
         Route::get('/sales-orders/{id}', [SalesOrderController::class, 'show']);
 
@@ -178,6 +180,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/overview', [ReportController::class, 'overview']);
 
         // --- Reports (16.8 + 16.9) ---
+        Route::get('/reports/quotations', [ReportController::class, 'quotations']);
+        Route::get('/invoices/{id}/print', [ReportController::class, 'invoicePrint']);
         Route::get('/reports', [ReportController::class, 'index']);
         Route::get('/reports/saved', [ReportController::class, 'saved']);
         Route::get('/reports/favourites', [ReportController::class, 'favourites']);
@@ -228,6 +232,7 @@ Route::prefix('v1')->group(function () {
 
         // --- Treasury: queries ---
         Route::get('/bank/imports', [BankImportController::class, 'index']);
+        Route::get('/bank-accounts', [BankAccountController::class, 'index']);
         Route::get('/bank/lines', [BankLineController::class, 'index']);
         Route::get('/bank/lines/{id}/candidates', [BankLineController::class, 'candidates']);
         Route::get('/bank/reconciliation', [BankReconciliationController::class, 'workbench']);
@@ -322,6 +327,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/quotations', [QuotationController::class, 'store']);
             Route::put('/quotations/{id}', [QuotationController::class, 'update']);
             Route::post('/quotations/{id}/status', [QuotationController::class, 'status']);
+            Route::post('/quotations/{id}/send', [QuotationController::class, 'send']);
             Route::post('/quotations/{id}/convert', [QuotationController::class, 'convert']);
             Route::post('/sales-orders', [SalesOrderController::class, 'store']);
             Route::post('/sales-orders/{id}/confirm', [SalesOrderController::class, 'confirm']);
@@ -372,6 +378,7 @@ Route::prefix('v1')->group(function () {
 
             // --- Treasury: commands ---
             Route::post('/imports/{type}', [ImportController::class, 'store']);
+            Route::post('/bank-accounts', [BankAccountController::class, 'store']);
             Route::post("/bank/imports", [BankImportController::class, "store"]);
             Route::post('/bank/lines/{id}/match', [BankLineController::class, 'match']);
             Route::post('/bank/lines/{id}/exclude', [BankLineController::class, 'exclude']);
