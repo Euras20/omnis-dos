@@ -15,8 +15,9 @@ use Illuminate\Support\Facades\DB;
 /**
  * POST /api/v1/fx/rates/fetch-xe
  *
- * Fetches mid-market rates (XE.com when credentials are present) and stores
- * them with a 3% selling markup for the requested date.
+ * Fetches mid-market rates and stores them immediately with a 3% selling markup.
+ * Uses the official XE Currency Data API when XE_ACCOUNT_ID / XE_API_KEY are set;
+ * otherwise uses the free mid-market fallback (open.er-api.com) and still saves.
  */
 final class FetchXeExchangeRates
 {
@@ -39,7 +40,12 @@ final class FetchXeExchangeRates
         $companyId = $this->companyContext->companyId();
 
         $date = $data['date'] ?? date('Y-m-d');
-        $currencies = $data['currencies'] ?? ['USD', 'EUR', 'CNY'];
+        // Currencies from the frontend Exchange rates / currency list (all active).
+        // Caller may override via the request body.
+        $currencies = $data['currencies'] ?? [
+            'USD', 'GBP', 'EUR', 'CHF', 'AUD', 'CAD', 'DKK', 'JPY', 'NZD',
+            'NOK', 'SEK', 'ZAR', 'CNY', 'XOF', 'GMD', 'MRU', 'NGN', 'SLL', 'WAU',
+        ];
 
         $fetched = $this->xeFxRateService->fetch($currencies);
 
