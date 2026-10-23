@@ -44,7 +44,7 @@ final class QuotationConversionQuery
         }
 
         $counts = (clone $base)
-            ->selectRaw('status, COUNT(*)::int AS n, COALESCE(SUM(gross_minor), 0)::bigint AS gross')
+            ->selectRaw('status, (COUNT(*))::int AS n, COALESCE(SUM(gross_minor), 0)::bigint AS gross')
             ->groupBy('status')
             ->get()
             ->keyBy('status');
@@ -59,8 +59,8 @@ final class QuotationConversionQuery
         $byCustomer = (clone $base)
             ->join('party', 'party.id', '=', 'quotation.customer_id')
             ->selectRaw("party.id AS customer_id, party.name AS customer_name,
-                COUNT(*) FILTER (WHERE quotation.status <> 'draft')::int AS sent,
-                COUNT(*) FILTER (WHERE quotation.status IN ('accepted', 'converted'))::int AS accepted,
+                (COUNT(*) FILTER (WHERE quotation.status <> 'draft'))::int AS sent,
+                (COUNT(*) FILTER (WHERE quotation.status IN ('accepted', 'converted')))::int AS accepted,
                 COALESCE(SUM(quotation.gross_minor) FILTER (WHERE quotation.status <> 'draft'), 0)::bigint AS sent_gross,
                 COALESCE(SUM(quotation.gross_minor) FILTER (WHERE quotation.status IN ('accepted', 'converted')), 0)::bigint AS accepted_gross")
             ->groupBy('party.id', 'party.name')
