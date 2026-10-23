@@ -76,6 +76,7 @@ Route::prefix('v1')->group(function () {
     // Public / unauthenticated endpoints
     Route::get('/health/live', fn () => response()->json(['status' => 'ok']));
     Route::get('/health/ready', fn () => response()->json(['status' => 'ok']));
+    Route::get('/public/quotations/{id}/pdf', [PublicQuotationController::class, 'pdf']);
 
     Route::get('/openapi.json', function () {
         $path = base_path('docs/openapi.json');

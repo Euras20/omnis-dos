@@ -103,7 +103,7 @@ final class EmailSendHandler
                     'body_preview' => mb_substr($body, 0, 200),
                 ]);
             } else {
-                $this->deliver($to, $cc, $subject, $body, $documentFileId);
+                $this->deliver($to, $cc, $subject, $body, $documentFileId, $payload);
             }
 
             EmailMessage::query()->where('id', $messageId)->update([
@@ -122,35 +122,46 @@ final class EmailSendHandler
         }
     }
 
-    private function deliver(string $to, mixed $cc, string $subject, string $body, mixed $documentFileId): void
+    private function deliver(string $to, mixed $cc, string $subject, string $body, mixed $documentFileId, array $payload): void
     {
         $apiKey = (string) (env('RESEND_API_KEY') ?: env('MAIL_PASSWORD'));
         $fromAddress = (string) config('mail.from.address', 'noreply@omnisdos.com');
         $fromName = (string) config('mail.from.name', 'OMNIS');
 
-        $payload = [
+        $message = [
             'from' => $fromName !== '' ? "{$fromName} <{$fromAddress}>" : $fromAddress,
             'to' => [$to],
             'subject' => $subject,
-            'text' => $body !== '' ? $body : $subject,
         ];
+        if (! empty($payload['html'])) {
+            $message['html'] = (string) $payload['html'];
+        } else {
+            $message['text'] = $body !== '' ? $body : $subject;
+        }
         if ($cc) {
-            $payload['cc'] = is_array($cc) ? $cc : [$cc];
+            $message['cc'] = is_array($cc) ? $cc : [$cc];
         }
 
-        $document = $documentFileId
-            ? DocumentFile::query()->where('id', $documentFileId)->first()
-            : null;
-        if ($document !== null && Storage::disk('local')->exists($document->storage_key)) {
-            $payload['attachments'] = [[
-                'filename' => $document->original_name ?: 'document.pdf',
-                'content' => base64_encode((string) Storage::disk('local')->get($document->storage_key)),
+        if (! empty($payload['pdfBase64'])) {
+            $message['attachments'] = [[
+                'filename' => (string) ($payload['pdfName'] ?? 'quotation.pdf'),
+                'content' => (string) $payload['pdfBase64'],
             ]];
+        } else {
+            $document = $documentFileId
+                ? DocumentFile::query()->where('id', $documentFileId)->first()
+                : null;
+            if ($document !== null && Storage::disk('local')->exists($document->storage_key)) {
+                $message['attachments'] = [[
+                    'filename' => $document->original_name ?: 'document.pdf',
+                    'content' => base64_encode((string) Storage::disk('local')->get($document->storage_key)),
+                ]];
+            }
         }
 
         $response = Http::withToken($apiKey)
             ->timeout(20)
-            ->post('https://api.resend.com/emails', $payload);
+            ->post('https://api.resend.com/emails', $message);
 
         if ($response->failed()) {
             throw new \RuntimeException('Resend API '.$response->status().': '.$response->body());
