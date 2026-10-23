@@ -35,12 +35,12 @@ final class QuotationConversionQuery
         $from = isset($filters['from']) && is_string($filters['from']) && $filters['from'] !== '' ? $filters['from'] : null;
         $to = isset($filters['to']) && is_string($filters['to']) && $filters['to'] !== '' ? $filters['to'] : null;
 
-        $base = DB::table('quotation')->where('company_id', $companyId);
+        $base = DB::table('quotation')->where('quotation.company_id', $companyId);
         if ($from !== null) {
-            $base->where('quotation_date', '>=', $from);
+            $base->where('quotation.quotation_date', '>=', $from);
         }
         if ($to !== null) {
-            $base->where('quotation_date', '<=', $to);
+            $base->where('quotation.quotation_date', '<=', $to);
         }
 
         $counts = (clone $base)
