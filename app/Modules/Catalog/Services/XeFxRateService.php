@@ -25,7 +25,10 @@ final class XeFxRateService
      * @param  list<string>  $currencies
      * @return list<array{currency: string, midRate: float, buyRate: float, sellRate: float, source: string}>
      */
-    public function fetch(array $currencies = ['USD', 'EUR', 'CNY']): array
+    public function fetch(array $currencies = [
+        'USD', 'GBP', 'EUR', 'CHF', 'AUD', 'CAD', 'DKK', 'JPY', 'NZD',
+        'NOK', 'SEK', 'ZAR', 'CNY', 'XOF', 'GMD', 'MRU', 'NGN', 'SLL', 'WAU',
+    ]): array
     {
         $currencies = array_values(array_unique(array_map('strtoupper', $currencies)));
         $currencies = array_filter($currencies, fn (string $c) => $c !== 'GHS' && strlen($c) === 3);

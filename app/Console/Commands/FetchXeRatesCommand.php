@@ -18,7 +18,7 @@ final class FetchXeRatesCommand extends Command
 {
     protected $signature = 'omnis:fx-fetch-xe
                             {--date= : Rate date (YYYY-MM-DD). Defaults to today.}
-                            {--currencies=USD,EUR,CNY : Comma-separated currency codes}';
+                            {--currencies= : Comma-separated codes. Defaults to the frontend currency list.}';
 
     protected $description = 'Fetch mid-market FX rates and store them with a 3% selling markup';
 
@@ -34,11 +34,13 @@ final class FetchXeRatesCommand extends Command
         }
 
         $date = $this->option('date') ?: date('Y-m-d');
-        $currencies = array_filter(array_map('trim', explode(',', (string) $this->option('currencies'))));
+        $currencies = $this->option('currencies')
+            ? array_filter(array_map('trim', explode(',', (string) $this->option('currencies'))))
+            : [];
 
         $result = $action->execute([
             'date' => $date,
-            'currencies' => $currencies,
+            ...($currencies !== [] ? ['currencies' => $currencies] : []),
         ]);
 
         $this->info('Stored '.count($result['rates']).' rates for '.$result['date']);
