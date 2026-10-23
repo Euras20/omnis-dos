@@ -6,15 +6,20 @@ namespace App\Modules\Sales\Actions;
 
 use App\Exceptions\BusinessRuleException;
 use App\Exceptions\NotFoundException;
+use App\Models\Company;
 use App\Models\CompanyBankAccount;
+use App\Models\DocumentFile;
 use App\Models\Party;
 use App\Models\Quotation;
 use App\Modules\Sales\Domain\QuotationStatus;
+use App\Modules\Sales\Support\QuotationDocument;
 use App\Shared\Audit\AuditWriter;
 use App\Shared\Company\CompanyContext;
 use App\Shared\Outbox\OutboxWriter;
 use App\Shared\Permissions\PermissionChecker;
+use App\Shared\Support\Uuid;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * POST /api/v1/quotations/{id}/send — email the quotation to the customer and mark it sent.
@@ -41,6 +46,7 @@ final class SendQuotation
 
         return DB::transaction(function () use ($id, $companyId, $actorId, $data) {
             $quotation = Quotation::query()
+                ->with('lines')
                 ->where('company_id', $companyId)
                 ->where('id', $id)
                 ->lockForUpdate()
@@ -71,24 +77,12 @@ final class SendQuotation
                 ->orderBy('bank_name')
                 ->get();
 
-            $bankLines = $banks->map(static fn ($b) => sprintf(
-                '%s — %s, %s%s',
-                $b->bank_name,
-                $b->account_name,
-                $b->account_number,
-                $b->branch ? ' ('.$b->branch.')' : ''
-            ))->implode("\n");
+            $company = Company::query()->where('id', $companyId)->firstOrFail();
+            $downloadUrl = rtrim((string) config('app.url'), '/')
+                .'/api/v1/public/quotations/'.$quotation->id.'/pdf?token='.QuotationDocument::token($quotation->id);
+            $doc = QuotationDocument::build($quotation, $customer, $company, $banks, $downloadUrl);
 
-            $body = sprintf(
-                "Quotation %s\nDate: %s\nDelivery: %s %s\nTotal: %s %s\n\nPay to:\n%s",
-                $quotation->quotation_no,
-                $quotation->quotation_date?->format('Y-m-d'),
-                $quotation->delivery_type ?? '',
-                $quotation->delivery_location ?? '',
-                $quotation->currency,
-                number_format(((int) $quotation->gross_minor) / 100, 2),
-                $bankLines !== '' ? $bankLines : 'Bank details on request.'
-            );
+            $document = $this->storePdf($doc['pdf'], $quotation, $companyId, $actorId);
 
             $this->outboxWriter->record([
                 'aggregate_type' => 'quotation',
@@ -98,9 +92,13 @@ final class SendQuotation
                     'companyId' => $companyId,
                     'to' => $to,
                     'subject' => 'Quotation '.$quotation->quotation_no,
-                    'body' => $body,
+                    'body' => 'Please find quotation '.$quotation->quotation_no.' attached.',
+                    'html' => $doc['html'],
+                    'pdfBase64' => base64_encode($doc['pdf']),
+                    'pdfName' => $quotation->quotation_no.'.pdf',
                     'entityType' => 'quotation',
                     'entityId' => $quotation->id,
+                    'documentFileId' => $document->id,
                     'idempotencyKey' => 'quotation-send-'.$quotation->id.'-'.now()->timestamp,
                 ],
             ]);
@@ -129,7 +127,28 @@ final class SendQuotation
                 'quotationNo' => $quotation->quotation_no,
                 'status' => $quotation->status,
                 'sentTo' => $to,
+                'documentFileId' => $document->id,
             ];
         });
+    }
+
+    private function storePdf(string $bytes, Quotation $quotation, string $companyId, ?string $actorId): DocumentFile
+    {
+        $key = sprintf('companies/%s/documents/quotation/%s/%s.pdf', $companyId, $quotation->id, Uuid::v7());
+        Storage::disk('local')->put($key, $bytes);
+
+        return DocumentFile::query()->create([
+            'id' => Uuid::v7(),
+            'company_id' => $companyId,
+            'original_name' => $quotation->quotation_no.'.pdf',
+            'storage_key' => $key,
+            'mime_type' => 'application/pdf',
+            'size_bytes' => strlen($bytes),
+            'scan_status' => 'clean',
+            'entity_type' => 'quotation',
+            'entity_id' => $quotation->id,
+            'uploaded_by' => $actorId,
+            'uploaded_at' => now(),
+        ]);
     }
 }
