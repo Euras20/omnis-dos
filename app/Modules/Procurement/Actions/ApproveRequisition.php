@@ -44,7 +44,11 @@ final class ApproveRequisition
             if (! in_array($req->status, ['pending', 'draft'], true)) {
                 throw new BusinessRuleException("Cannot approve requisition in status '{$req->status}'.");
             }
-            if ($req->requested_by !== null && $req->requested_by === $actorId) {
+            if (
+                $req->requested_by !== null
+                && $req->requested_by === $actorId
+                && ! $this->permissionChecker->isSystemAdministrator($actorId)
+            ) {
                 throw new BusinessRuleException('Segregation of duties: approver must differ from requester.');
             }
             $req->status = 'approved';
