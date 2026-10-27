@@ -49,7 +49,11 @@ final class ApproveStockCount
             if ($count->status !== 'awaiting_supervisor') {
                 throw new BusinessRuleException('Only counts awaiting supervisor can be approved or rejected.');
             }
-            if ($count->counted_by !== null && $count->counted_by === $actorId) {
+            if (
+                $count->counted_by !== null
+                && $count->counted_by === $actorId
+                && ! $this->permissionChecker->isSystemAdministrator($actorId)
+            ) {
                 throw new SodViolationException(
                     'The stock keeper who submitted the count cannot approve it (segregation of duties).'
                 );
