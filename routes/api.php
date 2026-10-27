@@ -285,6 +285,7 @@ Route::prefix('v1')->group(function () {
 
             // --- Receivables: commands ---
             Route::post('/invoices', [InvoiceController::class, 'store']);
+            Route::post('/invoices/{id}/send', [InvoiceController::class, 'send']);
             Route::post('/invoices/{id}/credit-notes', [InvoiceController::class, 'storeCreditNote']);
             Route::post('/receipts', [ReceiptController::class, 'store']);
             Route::post('/receipts/{id}/apply', [ReceiptController::class, 'apply']);

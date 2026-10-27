@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Receivables;
 use App\Http\Requests\Receivables\StoreInvoiceRequest;
 use App\Modules\Receivables\Actions\PostCreditNote;
 use App\Modules\Receivables\Actions\PostInvoice;
+use App\Modules\Receivables\Actions\SendInvoice;
 use App\Modules\Receivables\Queries\GetInvoiceQuery;
 use App\Modules\Receivables\Queries\ListInvoicesQuery;
 use Illuminate\Http\JsonResponse;
@@ -19,6 +20,7 @@ final class InvoiceController
         private readonly GetInvoiceQuery $getInvoiceQuery,
         private readonly PostInvoice $postInvoice,
         private readonly PostCreditNote $postCreditNote,
+        private readonly SendInvoice $sendInvoice,
     ) {
     }
 
@@ -47,6 +49,11 @@ final class InvoiceController
         $invoice = $this->postInvoice->execute($request->validated());
 
         return response()->json($invoice, 201);
+    }
+
+    public function send(string $id, Request $request): JsonResponse
+    {
+        return response()->json($this->sendInvoice->execute($id, $request->all()));
     }
 
     public function storeCreditNote(string $id, Request $request): JsonResponse

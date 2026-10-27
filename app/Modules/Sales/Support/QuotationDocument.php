@@ -27,13 +27,6 @@ final class QuotationDocument
 
         $lineSum = 0;
         $rows = '';
-        $pdfLines = [
-            (string) $company->legal_name,
-            (string) ($company->address ?? ''),
-            'Quote '.$quotation->quotation_no.'  '.$quotation->quotation_date?->format('d/m/Y'),
-            'Customer: '.($customer->name ?? ''),
-            '',
-        ];
 
         foreach ($quotation->lines as $i => $line) {
             $lineSum += (int) $line->net_minor;
@@ -48,7 +41,6 @@ final class QuotationDocument
                 .'<td style="padding:8px 6px;text-align:right;">'.$currency.' '.$money((int) $line->unit_price_minor).'</td>'
                 .'<td style="padding:8px 6px;text-align:right;">'.$currency.' '.$money((int) $line->net_minor).'</td>'
                 .'</tr>';
-            $pdfLines[] = sprintf('%s  %s  x%s  %s %s', $part, $line->description, $line->qty, $currency, $money((int) $line->net_minor));
         }
 
         $discountPct = (float) $quotation->discount_percent;
@@ -64,14 +56,6 @@ final class QuotationDocument
 
         $incoterms = trim(($quotation->delivery_type ?? '').' '.($quotation->delivery_location ?? ''));
         $job = $quotation->memo ?: 'Quotation '.$quotation->quotation_no;
-
-        $pdfLines[] = '';
-        $pdfLines[] = 'Sub-total '.$currency.' '.$money($lineSum);
-        if ($discountMinor > 0) {
-            $pdfLines[] = 'Discount '.$discountPct.'%  -'.$currency.' '.$money($discountMinor);
-        }
-        $pdfLines[] = 'Grand total '.$currency.' '.$money($grandMinor);
-        $pdfLines[] = $incoterms !== '' ? 'Incoterms: '.$incoterms : '';
 
         $companyLines = array_filter([
             $company->legal_name,
@@ -127,13 +111,67 @@ final class QuotationDocument
             .'<div style="font-weight:700;text-decoration:underline;color:#025b7a;">NOTES:</div>'
             .'<div style="font-weight:600;margin-top:4px;">100% payment due upon order</div>'
             .'<div style="margin-top:4px;">'.$bankLine.'</div>'
-            .'<div style="text-align:center;margin:28px 0;"><a href="'.$e($downloadUrl).'" style="background:#016a8b;color:#fff;text-decoration:none;padding:10px 18px;font-weight:700;font-size:12px;">Download PDF</a></div>'
-            .'<div style="text-align:center;font-weight:600;">This Offer is subject to '.$e($company->legal_name).'\'s General Terms and Conditions</div>'
+            .'<div style="text-align:center;margin-top:18px;font-weight:600;">This Offer is subject to '.$e($company->legal_name).'\'s General Terms and Conditions</div>'
             .'</div></div></body></html>';
 
         return [
             'html' => $html,
-            'pdf' => SimplePdf::fromLines('Quotation '.$quotation->quotation_no, array_values(array_filter($pdfLines))),
+            'pdf' => SheetPdf::render(self::sheet($quotation, $customer, $company, $banks, $lineSum, $discountPct, $discountMinor, $totalMinor, $taxMinor, $grandMinor, $currency, $money, $incoterms, $job)),
+        ];
+    }
+
+    /**
+     * @param  callable(int): string  $money
+     * @param  \Illuminate\Support\Collection<int, CompanyBankAccount>  $banks
+     * @return array<string, mixed>
+     */
+    private static function sheet(Quotation $quotation, ?Party $customer, Company $company, $banks, int $lineSum, float $discountPct, int $discountMinor, int $totalMinor, int $taxMinor, int $grandMinor, string $currency, callable $money, string $incoterms, string $job): array
+    {
+        $rows = [];
+        foreach ($quotation->lines as $line) {
+            $rows[] = [
+                'no' => (string) $line->line_no,
+                'part' => (string) ($line->item?->sku ?: '—'),
+                'description' => (string) $line->description,
+                'qty' => (string) $line->qty,
+                'unit' => $currency.' '.$money((int) $line->unit_price_minor),
+                'total' => $currency.' '.$money((int) $line->net_minor),
+            ];
+        }
+        $bank = $banks->first();
+        $notes = ['100% payment due upon order'];
+        $notes[] = $bank
+            ? sprintf('%s — %s, %s%s', $bank->bank_name, $bank->account_name, $bank->account_number, $bank->swift ? ' SWIFT '.$bank->swift : '')
+            : 'Bank details on request.';
+        if ($incoterms !== '') {
+            $notes[] = 'Incoterms: '.$incoterms;
+        }
+
+        $totals = [['label' => 'SUB-TOTAL', 'value' => $currency.' '.$money($lineSum)]];
+        if ($discountMinor > 0) {
+            $totals[] = ['label' => 'Discount '.$discountPct.'%', 'value' => '-'.$currency.' '.$money($discountMinor)];
+        }
+        $totals[] = ['label' => 'TOTAL', 'value' => $currency.' '.$money($totalMinor)];
+        $totals[] = ['label' => 'TAX', 'value' => $taxMinor > 0 ? $currency.' '.$money($taxMinor) : 'EXCLUDED'];
+        $totals[] = ['label' => 'GRAND TOTAL', 'value' => $currency.' '.$money($grandMinor), 'emphasis' => true];
+
+        return [
+            'title' => 'Quotation',
+            'company' => array_values(array_filter([(string) $company->legal_name, (string) ($company->address ?? ''), (string) ($company->phone ?? ''), (string) ($company->email ?? '')])),
+            'customer' => array_values(array_filter([(string) ($customer->name ?? ''), (string) ($customer->delivery_address ?: $customer->address ?? '')])),
+            'meta' => [
+                'Quote No: '.$quotation->quotation_no,
+                'Date: '.$quotation->quotation_date?->format('d/m/Y'),
+                'Customer: '.($customer->code ?? ''),
+                'Valid until: '.($quotation->valid_until?->format('d/m/Y') ?? '—'),
+            ],
+            'job' => $job,
+            'terms' => 'Cash/Bank Transfer',
+            'expiry' => (string) ($quotation->valid_until?->format('d/m/Y') ?? '—'),
+            'rows' => $rows,
+            'totals' => $totals,
+            'notes' => $notes,
+            'footer' => 'This offer is subject to '.$company->legal_name.' terms and conditions.',
         ];
     }
 
