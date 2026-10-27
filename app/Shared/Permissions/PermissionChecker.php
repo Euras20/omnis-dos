@@ -87,6 +87,36 @@ final class PermissionChecker
     }
 
     /**
+     * True when the user holds the system administrator role
+     * (code `admin` or `system_administrator`).
+     *
+     * System administrators bypass runtime same-actor SoD checks so a single
+     * admin account can complete every step of a workflow.
+     */
+    public function isSystemAdministrator(?string $userId): bool
+    {
+        if ($userId === null || $userId === '') {
+            return false;
+        }
+
+        if (! $this->companyContext->isResolved()) {
+            return false;
+        }
+
+        try {
+            return DB::table('user_role as ur')
+                ->join('role as r', 'r.id', '=', 'ur.role_id')
+                ->where('ur.company_id', $this->companyContext->companyId())
+                ->where('ur.user_id', $userId)
+                ->whereIn('r.code', ['admin', 'system_administrator'])
+                ->where('r.is_active', true)
+                ->exists();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * Same-actor SoD helper used by posting / approval paths.
      * Returns true when the two actor IDs are different (and both non-null).
      */
@@ -111,5 +141,23 @@ final class PermissionChecker
                 $message ?? 'Segregation of duties: the same person may not perform both steps.'
             );
         }
+    }
+
+    /**
+     * Assert the two actors are different, unless the current actor is a
+     * system administrator (who may complete every step).
+     *
+     * @throws SodViolationException
+     */
+    public function assertDifferentActorsUnlessSystemAdmin(
+        ?string $currentActor,
+        ?string $otherActor,
+        ?string $message = null,
+    ): void {
+        if ($this->isSystemAdministrator($currentActor)) {
+            return;
+        }
+
+        $this->assertDifferentActors($currentActor, $otherActor, $message);
     }
 }
