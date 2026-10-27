@@ -95,7 +95,11 @@ final class ListPartiesQuery
         $types = [];
 
         if ($this->permissionChecker->can($actorId, 'customers.view')
-            || $this->permissionChecker->can($actorId, 'customers.manage')) {
+            || $this->permissionChecker->can($actorId, 'customers.manage')
+            || $this->permissionChecker->can($actorId, 'sales.quotes.manage')
+            || $this->permissionChecker->can($actorId, 'sales.quotes.view')
+            || $this->permissionChecker->can($actorId, 'sales.orders.manage')
+            || $this->permissionChecker->can($actorId, 'sales.orders.view')) {
             $types[] = 'customer';
         }
 

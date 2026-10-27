@@ -36,6 +36,47 @@ final class PostStockTransfer
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
+    public function executeBulk(array $data): array
+    {
+        $actorId = $this->companyContext->userId();
+        $this->permissionChecker->assertCan($actorId, 'stock.move');
+
+        $lines = $data['lines'] ?? null;
+        if (! is_array($lines) || $lines === []) {
+            throw new BusinessRuleException('lines must be a non-empty array.');
+        }
+        if (count($lines) > 100) {
+            throw new BusinessRuleException('A bulk transfer accepts at most 100 lines.');
+        }
+
+        $defaults = [
+            'fromLocationId' => $data['fromLocationId'] ?? null,
+            'toLocationId' => $data['toLocationId'] ?? null,
+            'transferDate' => $data['transferDate'] ?? $data['date'] ?? null,
+            'memo' => $data['memo'] ?? null,
+        ];
+
+        return DB::transaction(function () use ($lines, $defaults) {
+            $items = [];
+            foreach ($lines as $index => $line) {
+                if (! is_array($line)) {
+                    throw new BusinessRuleException('Line '.($index + 1).' must be an object.');
+                }
+                $payload = array_merge(array_filter($defaults, static fn ($v) => $v !== null), $line);
+                $items[] = $this->execute($payload);
+            }
+
+            return [
+                'items' => $items,
+                'total' => count($items),
+            ];
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
     public function execute(array $data): array
     {
         $actorId = $this->companyContext->userId();

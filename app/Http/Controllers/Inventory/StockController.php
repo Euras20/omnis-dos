@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Inventory;
 
 use App\Http\Requests\Inventory\ApproveStockCountRequest;
+use App\Http\Requests\Inventory\BulkAssignmentRequest;
+use App\Http\Requests\Inventory\BulkStockTransferRequest;
 use App\Http\Requests\Inventory\DecideAssignmentRequest;
 use App\Http\Requests\Inventory\StoreAssignmentRequest;
 use App\Http\Requests\Inventory\StoreStockCountRequest;
@@ -84,6 +86,11 @@ final class StockController
         return response()->json($this->createAssignment->execute($request->validated()), 201);
     }
 
+    public function storeAssignmentsBulk(BulkAssignmentRequest $request): JsonResponse
+    {
+        return response()->json($this->createAssignment->executeBulk($request->validated()), 201);
+    }
+
     public function decideAssignment(string $id, DecideAssignmentRequest $request): JsonResponse
     {
         return response()->json($this->decideAssignment->execute($id, $request->validated()));
@@ -119,6 +126,11 @@ final class StockController
     public function storeTransfer(StoreStockTransferRequest $request): JsonResponse
     {
         return response()->json($this->postStockTransfer->execute($request->validated()), 201);
+    }
+
+    public function storeTransfersBulk(BulkStockTransferRequest $request): JsonResponse
+    {
+        return response()->json($this->postStockTransfer->executeBulk($request->validated()), 201);
     }
 
     public function counts(Request $request): JsonResponse

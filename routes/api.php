@@ -300,8 +300,10 @@ Route::prefix('v1')->group(function () {
 
             // --- Inventory / Stock: commands ---
             Route::post('/stock/assignments', [StockController::class, 'storeAssignment']);
+            Route::post('/stock/assignments/bulk', [StockController::class, 'storeAssignmentsBulk']);
             Route::post('/stock/assignments/{id}/decide', [StockController::class, 'decideAssignment']);
             Route::post('/stock/transfers', [StockController::class, 'storeTransfer']);
+            Route::post('/stock/transfers/bulk', [StockController::class, 'storeTransfersBulk']);
             Route::post('/stock/counts', [StockController::class, 'storeCount']);
             Route::post('/stock/counts/{id}/submit', [StockController::class, 'submitCount']);
             Route::post('/stock/counts/{id}/approve', [StockController::class, 'approveCount']);
