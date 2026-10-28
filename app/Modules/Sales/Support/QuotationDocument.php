@@ -78,7 +78,7 @@ final class QuotationDocument
             .'<table style="width:100%;font-size:12px;"><tr>'
             .'<td style="width:33%;vertical-align:top;line-height:1.5;">'.$companyHtml.'<div style="height:12px;"></div>'.$customerHtml.'</td>'
             .'<td style="width:34%;text-align:center;vertical-align:top;">'
-            .'<img src="'.$e($logo).'" alt="'. $e($company->legal_name) .'" width="160" style="display:block;margin:0 auto;width:160px;height:auto;background:#000;">'
+            .'<img src="'.$e($logo).'" alt="'.$e($company->legal_name).'" width="160" style="display:block;margin:0 auto;width:160px;height:auto;">'
             .'</td>'
             .'<td style="width:33%;text-align:right;vertical-align:top;font-weight:600;line-height:1.6;">'
             .'Quote No: '.$e($quotation->quotation_no).'<br>'
