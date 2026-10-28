@@ -65,13 +65,16 @@ final class InvoiceDocument
             }
         }
 
+        $logo = rtrim((string) config('app.url'), '/').'/logo.png';
         $html = '<!DOCTYPE html><html><body style="margin:0;background:#f3f4f6;font-family:Segoe UI,Arial,sans-serif;color:#1f2937;">'
             .'<div style="max-width:850px;margin:24px auto;background:#fff;padding:32px 40px;">'
             .'<div style="text-align:center;color:#1c8ba6;font-size:32px;font-weight:300;margin-bottom:16px;">Invoice</div>'
             .'<table style="width:100%;font-size:12px;"><tr>'
             .'<td style="width:33%;vertical-align:top;line-height:1.5;">'.$companyHtml.'<div style="height:12px;"></div>'
             .'<div style="font-weight:700;">'.$e($customer->name ?? '').'</div><div>'.$e($customer->delivery_address ?: $customer->address ?? '').'</div></td>'
-            .'<td style="width:34%;text-align:center;vertical-align:top;"><div style="font-weight:700;letter-spacing:4px;">'.strtoupper($e($company->legal_name)).'</div></td>'
+            .'<td style="width:34%;text-align:center;vertical-align:top;">'
+            .'<img src="'.$e($logo).'" alt="'.$e($company->legal_name).'" width="160" style="display:block;margin:0 auto;width:160px;height:auto;background:#000;">'
+            .'</td>'
             .'<td style="width:33%;text-align:right;vertical-align:top;font-weight:600;line-height:1.6;">'
             .'Invoice No: '.$e($invoice->invoice_no).'<br>Date: '.$e((string) $invoice->invoice_date?->format('d/m/Y')).'<br>'
             .'Due: '.$e((string) ($invoice->due_date?->format('d/m/Y') ?? '—')).'<br>Customer: '.$e($customer->code ?? '').'</td>'
