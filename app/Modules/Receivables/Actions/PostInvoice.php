@@ -120,6 +120,17 @@ final class PostInvoice
                 }
             }
 
+            // Order lines used to auto-link invoice lines when salesOrderLineId is omitted.
+            $orderLines = $salesOrderId === null
+                ? collect()
+                : SalesOrderLine::query()
+                    ->where('company_id', $companyId)
+                    ->where('sales_order_id', $salesOrderId)
+                    ->orderBy('line_no')
+                    ->lockForUpdate()
+                    ->get();
+            $claimedOrderLineIds = [];
+
             $invoiceId = Uuid::v7();
             $invoiceNo = $this->nextNumber($companyId, $invoiceDate, 'invoice');
 
@@ -151,11 +162,19 @@ final class PostInvoice
                     ? (string) $raw['salesOrderLineId']
                     : null;
 
-                // Billing against an order requires line linkage so qty_invoiced can be updated.
+                // When the client sends the order but not the line id, link to the
+                // existing sales_order_line so qty_invoiced is still updated.
                 if ($salesOrderId !== null && $salesOrderLineId === null) {
-                    throw new BusinessRuleException(
-                        "Line {$i}: salesOrderLineId is required when salesOrderId is set (prevents double billing)."
+                    $salesOrderLineId = $this->resolveSalesOrderLineId(
+                        $orderLines,
+                        $raw,
+                        $i,
+                        count($rawLines),
+                        $claimedOrderLineIds,
                     );
+                }
+                if ($salesOrderLineId !== null) {
+                    $claimedOrderLineIds[$salesOrderLineId] = true;
                 }
 
                 if ($salesOrderLineId !== null) {
@@ -351,6 +370,84 @@ final class PostInvoice
 
             return $this->toArray(Invoice::query()->with('lines')->findOrFail($invoiceId));
         });
+    }
+
+    /**
+     * Pick the existing sales_order_line id when the client omitted it.
+     *
+     * Match order: itemId, lineNo, only remaining line, same-count positional.
+     *
+     * @param  \Illuminate\Support\Collection<int, SalesOrderLine>  $orderLines
+     * @param  array<string, mixed>  $raw
+     * @param  array<string, true>  $claimed
+     */
+    private function resolveSalesOrderLineId(
+        $orderLines,
+        array $raw,
+        int $index,
+        int $invoiceLineCount,
+        array $claimed,
+    ): string {
+        $available = $orderLines->filter(
+            static fn (SalesOrderLine $l) => ! isset($claimed[(string) $l->id])
+                && ((float) $l->qty - (float) $l->qty_invoiced) > 0.0005
+        )->values();
+
+        if ($available->isEmpty()) {
+            throw new BusinessRuleException(
+                "Line {$index}: no uninvoiced sales order line remains to link."
+            );
+        }
+
+        $itemId = isset($raw['itemId']) && $raw['itemId'] !== '' ? (string) $raw['itemId'] : null;
+        if ($itemId !== null) {
+            $byItem = $available->filter(
+                static fn (SalesOrderLine $l) => (string) $l->item_id === $itemId
+            )->values();
+            if ($byItem->count() === 1) {
+                return (string) $byItem->first()->id;
+            }
+        }
+
+        $lineNo = isset($raw['lineNo']) ? (int) $raw['lineNo'] : 0;
+        if ($lineNo > 0) {
+            $byNo = $available->first(
+                static fn (SalesOrderLine $l) => (int) $l->line_no === $lineNo
+            );
+            if ($byNo !== null) {
+                return (string) $byNo->id;
+            }
+        }
+
+        $description = strtolower(trim((string) ($raw['description'] ?? '')));
+        if ($description !== '') {
+            $byDesc = $available->filter(
+                static fn (SalesOrderLine $l) => strtolower(trim((string) $l->description)) === $description
+            )->values();
+            if ($byDesc->count() === 1) {
+                return (string) $byDesc->first()->id;
+            }
+        }
+
+        if ($available->count() === 1) {
+            return (string) $available->first()->id;
+        }
+
+        if ($invoiceLineCount === $orderLines->count() && $orderLines->has($index)) {
+            $positional = $orderLines->values()->get($index);
+            if ($positional !== null && ! isset($claimed[(string) $positional->id])) {
+                return (string) $positional->id;
+            }
+        }
+
+        $choices = $available->map(
+            static fn (SalesOrderLine $l) => $l->line_no.':'.$l->id
+        )->implode(', ');
+
+        throw new BusinessRuleException(
+            "Line {$index}: could not pick a sales order line automatically. "
+            ."Send salesOrderLineId. Available: {$choices}."
+        );
     }
 
     /**
