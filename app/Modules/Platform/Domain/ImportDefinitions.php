@@ -158,4 +158,26 @@ final class ImportDefinitions
     {
         return self::all()[$type] ?? null;
     }
+
+    /**
+     * One example data row for the downloadable template.
+     * Users replace or delete it before upload. Values are illustrative only.
+     *
+     * @return list<string>
+     */
+    public static function sampleRow(string $type): array
+    {
+        return match ($type) {
+            'items' => ['TR-9001', 'Sample Valve', 'Trading good', '', 'pcs', '150.00', '80.00', '75.00', '1.2', 'Buy', 'true', '10', '5', '1400', 'true'],
+            'customers' => ['C-SAMPLE-01', 'Sample Customer Ltd', 'C0000000001', '', 'Accra', 'Greater Accra', 'GH', 'Plot 1', 'Warehouse 2', 'CIF', 'Ama Mensah', 'ama@sample.com', '+233200000000', 'Net 30', '50000.00', 'GHS', 'true', 'true'],
+            'suppliers' => ['S-SAMPLE-01', 'Sample Supplier Ltd', '', '', 'Tema', 'Greater Accra', 'GH', 'Industrial Area', '', 'FOB', '', 'supplier@sample.com', '+233200000001', 'Net 15', '', 'GHS', 'false', 'true'],
+            'accounts' => ['9999', 'Sample Expense', 'expense', 'detail', 'GHS', '', '', 'debit', 'true'],
+            'receivables' => ['INV-SAMPLE-001', 'C-SAMPLE-01', '2026-10-01', '2026-10-31', 'GHS', '1000.00', '150.00', '1150.00', 'Sample line', 'Imported sample'],
+            'payables' => ['BILL-SAMPLE-001', 'S-SAMPLE-01', 'SUP-INV-1', '2026-10-01', '2026-10-31', 'GHS', '500.00', '75.00', '575.00', '', 'Imported sample'],
+            'delivery' => ['TR-9001', 'TEM-GEN', 'LOT-1', '5', '80.00', '2026-10-15', 'Sample delivery'],
+            'bank-statement' => ['1000', '2026-10-15', 'REF-1', 'Customer payment', '1500.00', 'credit'],
+            default => [],
+        };
+    }
+
 }
