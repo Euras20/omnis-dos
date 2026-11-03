@@ -41,10 +41,9 @@ final class ImportController extends Controller
         }
 
         $headers = array_column($def['columns'], 'name');
-        // Blank data row only. Hints live in the JSON template list, not in the CSV,
-        // so a user who downloads and re-uploads the template cannot insert the hint text.
-        $blank = array_fill(0, count($headers), '');
-        $csv = implode(',', $headers)."\n".implode(',', $blank)."\n";
+        // One example row so the user can see the expected values. Replace or delete before upload.
+        $sample = ImportDefinitions::sampleRow($type);
+        $csv = implode(',', $headers)."\n".implode(',', $sample)."\n";
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv; charset=utf-8',
