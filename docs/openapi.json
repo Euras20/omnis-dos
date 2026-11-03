@@ -6357,6 +6357,137 @@
         }
       }
     },
+    "/returns/returnable-lines": {
+      "get": {
+        "tags": ["Fulfillment"],
+        "summary": "Delivered lines that still have quantity that can be returned",
+        "operationId": "listReturnableLines",
+        "responses": {
+          "200": { "description": "Returnable delivery lines" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/returns": {
+      "get": {
+        "tags": ["Fulfillment"],
+        "summary": "List goods returns",
+        "operationId": "listReturns",
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["awaiting_inspection", "restocked", "written_off", "awaiting_dispatch", "dispatched"] } },
+          { "name": "kind", "in": "query", "schema": { "type": "string", "enum": ["customer", "supplier"] } },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" }
+        ],
+        "responses": {
+          "200": { "description": "Returns" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      },
+      "post": {
+        "tags": ["Fulfillment"],
+        "summary": "Create a goods return (customer from a delivered line, or supplier from quarantine)",
+        "operationId": "createGoodsReturn",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["kind", "qty", "reason"],
+                "properties": {
+                  "kind": { "type": "string", "enum": ["customer", "supplier"] },
+                  "qty": { "type": "number", "exclusiveMinimum": 0 },
+                  "reason": { "type": "string" },
+                  "returnDate": { "type": "string", "format": "date" },
+                  "deliveryNoteLineId": { "type": "string", "format": "uuid", "description": "Required when kind is customer" },
+                  "itemId": { "type": "string", "format": "uuid", "description": "Required when kind is supplier" },
+                  "locationId": { "type": "string", "format": "uuid" },
+                  "lot": { "type": "string" },
+                  "partyId": { "type": "string", "format": "uuid" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Return created" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/returns/{id}": {
+      "get": {
+        "tags": ["Fulfillment"],
+        "summary": "Get a goods return",
+        "operationId": "getGoodsReturn",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Return" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/returns/{id}/inspect": {
+      "post": {
+        "tags": ["Fulfillment"],
+        "summary": "QC inspect a customer return: restock or write off",
+        "operationId": "inspectGoodsReturn",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["decision"],
+                "properties": {
+                  "decision": { "type": "string", "enum": ["restock", "scrap"] },
+                  "locationId": { "type": "string", "format": "uuid", "description": "Restock destination. Defaults to item default or a store location." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Inspected" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/returns/{id}/dispatch": {
+      "post": {
+        "tags": ["Fulfillment"],
+        "summary": "Dispatch a supplier return (stock out, reduce GRNI)",
+        "operationId": "dispatchSupplierReturn",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "description": "Dispatched" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
     "/shipments": {
       "get": {
         "tags": [

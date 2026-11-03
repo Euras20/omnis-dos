@@ -22,6 +22,7 @@ use App\Http\Controllers\Ledger\JournalController;
 use App\Http\Controllers\Inventory\DeliveryController;
 use App\Http\Controllers\Inventory\StockController;
 use App\Http\Controllers\Fulfillment\DeliveryNoteController;
+use App\Http\Controllers\Fulfillment\GoodsReturnController;
 use App\Http\Controllers\Payables\BillController;
 use App\Http\Controllers\Payables\SupplierPaymentController;
 use App\Http\Controllers\Procurement\GoodsReceiptController;
@@ -153,6 +154,11 @@ Route::prefix('v1')->group(function () {
         // --- Delivery workflow (15.5) ---
         Route::get('/delivery-notes', [DeliveryNoteController::class, 'index']);
         Route::get('/delivery-notes/{id}', [DeliveryNoteController::class, 'show']);
+
+        // --- Goods returns (Delivery › Returns) ---
+        Route::get('/returns/returnable-lines', [GoodsReturnController::class, 'returnable']);
+        Route::get('/returns', [GoodsReturnController::class, 'index']);
+        Route::get('/returns/{id}', [GoodsReturnController::class, 'show']);
 
         // --- Logistics (15.6 — jobs excluded) ---
         Route::get('/shipments', [ShipmentController::class, 'index']);
@@ -317,6 +323,10 @@ Route::prefix('v1')->group(function () {
             Route::post('/delivery-notes/{id}/confirm', [DeliveryNoteController::class, 'confirm']);
             Route::post('/delivery-notes/{id}/fail', [DeliveryNoteController::class, 'fail']);
             Route::post('/delivery-notes/{id}/reschedule', [DeliveryNoteController::class, 'reschedule']);
+
+            Route::post('/returns', [GoodsReturnController::class, 'store']);
+            Route::post('/returns/{id}/inspect', [GoodsReturnController::class, 'inspect']);
+            Route::post('/returns/{id}/dispatch', [GoodsReturnController::class, 'dispatch']);
 
             // --- Logistics (15.6) ---
             Route::post('/shipments', [ShipmentController::class, 'store']);

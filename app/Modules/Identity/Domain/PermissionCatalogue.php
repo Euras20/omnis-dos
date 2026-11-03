@@ -69,6 +69,8 @@ final class PermissionCatalogue
             self::entry('stock.view', 'Stock', 'Stock on hand', 'View', 'View stock on hand and low-stock alerts', false),
             self::entry('stock.move', 'Stock', 'Receiving and delivery', 'Move', 'Record stock movements', true),
             self::entry('stock.approve', 'Stock', 'Assignments and counts', 'Approve', 'Approve stock adjustments', true),
+            self::entry('delivery.view', 'Delivery', 'Returns', 'View', 'View goods returns', false),
+            self::entry('delivery.return', 'Delivery', 'Returns', 'Create', 'Create customer and supplier returns', true),
             self::entry('items.view', 'Stock', 'Items and locations', 'View', 'View items and locations', false),
             self::entry('items.manage', 'Stock', 'Items and locations', 'Manage', 'Manage items and locations', false),
 
