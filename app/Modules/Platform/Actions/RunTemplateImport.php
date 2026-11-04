@@ -173,21 +173,21 @@ final class RunTemplateImport
             $count = $this->insert($type, $parsed, $companyId, $actorId, $partyByCode, $itemBySku, $locationByCode, $accountByCode, $bankImportId);
 
             $this->auditWriter->write(
-                companyId: $companyId,
-                actorId: $actorId,
                 action: 'import.'.$type,
-                subjectType: 'import',
-                subjectId: $type,
-                payload: ['type' => $type, 'rowCount' => $count],
-                requestId: $this->companyContext->requestId(),
+                entityType: 'import',
+                entityId: $type,
+                detail: ['type' => $type, 'rowCount' => $count],
+                actorId: $actorId,
             );
 
-            $this->outboxWriter->write(
-                companyId: $companyId,
-                type: 'import.completed',
-                payload: ['importType' => $type, 'rowCount' => $count],
-                requestId: $this->companyContext->requestId(),
-            );
+            $this->outboxWriter->record([
+                'company_id' => $companyId,
+                'aggregate_type' => 'import',
+                'aggregate_id' => $type,
+                'event_type' => 'import.completed',
+                'payload' => ['importType' => $type, 'rowCount' => $count],
+                'request_id' => $this->companyContext->requestId(),
+            ]);
 
             return [
                 'type' => $type,
