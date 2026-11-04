@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * GET /api/v1/stock/on-hand — on hand, assigned and available by item, location, lot.
+ *
+ * Returns every active stockable item, including those with zero stock.
+ * Items with no movements appear as a single zero row (location and lot null).
  */
 final class StockOnHandQuery
 {
@@ -37,19 +40,26 @@ final class StockOnHandQuery
         $offset = max((int) ($filters['offset'] ?? 0), 0);
 
         $params = [$companyId];
-        $where = ['sa.company_id = ?'];
+        $where = [
+            'i.company_id = ?',
+            'i.is_active = true',
+            "i.item_type <> 'Service'",
+            "COALESCE(i.inventory_policy, '') <> 'Service'",
+        ];
 
-        if ($itemId !== null && $itemId !== '') {
-            $where[] = 'sa.item_id = ?';
-            $params[] = $itemId;
-        }
+        $joinOn = 'sa.item_id = i.id AND sa.company_id = i.company_id';
         if ($locationId !== null && $locationId !== '') {
-            $where[] = 'sa.location_id = ?';
+            $joinOn .= ' AND sa.location_id = ?';
             $params[] = $locationId;
         }
         if ($lot !== null && $lot !== '') {
-            $where[] = 'sa.lot = ?';
+            $joinOn .= ' AND sa.lot = ?';
             $params[] = $lot;
+        }
+
+        if ($itemId !== null && $itemId !== '') {
+            $where[] = 'i.id = ?';
+            $params[] = $itemId;
         }
         if ($q !== null && $q !== '') {
             $where[] = '(i.sku ILIKE ? OR i.name ILIKE ? OR sa.lot ILIKE ?)';
@@ -61,13 +71,14 @@ final class StockOnHandQuery
 
         $whereSql = implode(' AND ', $where);
 
-        $countRow = DB::selectOne(
-            "SELECT COUNT(*) AS c
-             FROM stock_available sa
-             JOIN item i ON i.id = sa.item_id
-             WHERE {$whereSql}",
-            $params,
-        );
+        $fromSql = "
+            FROM item i
+            LEFT JOIN stock_available sa ON {$joinOn}
+            LEFT JOIN location l ON l.id = sa.location_id
+            WHERE {$whereSql}
+        ";
+
+        $countRow = DB::selectOne("SELECT COUNT(*) AS c {$fromSql}", $params);
         $total = (int) ($countRow->c ?? 0);
 
         $params[] = $limit;
@@ -75,23 +86,20 @@ final class StockOnHandQuery
 
         $rows = DB::select(
             "SELECT
-                sa.item_id,
+                i.id AS item_id,
                 i.sku,
                 i.name AS item_name,
                 sa.location_id,
                 l.code AS location_code,
                 l.name AS location_name,
                 sa.lot,
-                sa.qty_on_hand,
-                sa.qty_assigned,
-                sa.qty_available,
-                sa.avg_unit_cost_minor,
-                sa.value_minor
-             FROM stock_available sa
-             JOIN item i ON i.id = sa.item_id
-             JOIN location l ON l.id = sa.location_id
-             WHERE {$whereSql}
-             ORDER BY i.sku, l.code, sa.lot
+                COALESCE(sa.qty_on_hand, 0) AS qty_on_hand,
+                COALESCE(sa.qty_assigned, 0) AS qty_assigned,
+                COALESCE(sa.qty_available, 0) AS qty_available,
+                COALESCE(sa.avg_unit_cost_minor, 0) AS avg_unit_cost_minor,
+                COALESCE(sa.value_minor, 0) AS value_minor
+             {$fromSql}
+             ORDER BY i.sku, l.code NULLS LAST, sa.lot NULLS LAST
              LIMIT ? OFFSET ?",
             $params,
         );

@@ -140,7 +140,7 @@ final class CreateStockCount
                 actorId: $actorId,
             );
 
-            return $this->toArray(StockCount::query()->with(['lines.item', 'location'])->findOrFail($countId));
+            return $this->toArray(StockCount::query()->with(['lines.item', 'location', 'countedByUser', 'approvedByUser'])->findOrFail($countId));
         });
     }
 
@@ -202,10 +202,15 @@ final class CreateStockCount
             'locationCode' => $c->location?->code,
             'countDate' => $c->count_date?->format('Y-m-d'),
             'status' => $c->status,
-            'countedBy' => $c->counted_by,
-            'countedAt' => $c->counted_at?->toIso8601String(),
-            'approvedBy' => $c->approved_by,
+            'submittedBy' => $c->countedByUser?->display_name,
+            'submittedById' => $c->counted_by,
+            'submittedAt' => $c->counted_at?->toIso8601String(),
+            'supervisor' => $c->approvedByUser?->display_name,
+            'supervisorId' => $c->approved_by,
             'approvedAt' => $c->approved_at?->toIso8601String(),
+            'countedBy' => $c->countedByUser?->display_name,
+            'countedAt' => $c->counted_at?->toIso8601String(),
+            'approvedBy' => $c->approvedByUser?->display_name,
             'memo' => $c->memo,
             'lines' => $c->lines->map(static fn (StockCountLine $l) => [
                 'id' => $l->id,

@@ -22,7 +22,7 @@ final class ListItemsQuery
     }
 
     /**
-     * @param  array{q?: ?string, type?: ?string, category?: ?string, status?: ?string, limit?: mixed, offset?: mixed}  $filters
+     * @param  array<string, mixed>  $filters
      * @return array{items: list<array<string, mixed>>, total: int, limit: int, offset: int}
      */
     public function execute(array $filters): array
@@ -34,18 +34,48 @@ final class ListItemsQuery
 
         $query = Item::query();
 
-        if (($filters['status'] ?? null) === 'active') {
+        $status = isset($filters['status']) ? strtolower(trim((string) $filters['status'])) : '';
+        $isActive = $filters['isActive'] ?? null;
+        if ($status === 'active' || $isActive === true || $isActive === 'true' || $isActive === '1') {
             $query->where('is_active', true);
-        } elseif (($filters['status'] ?? null) === 'inactive') {
+        } elseif ($status === 'inactive' || $isActive === false || $isActive === 'false' || $isActive === '0') {
             $query->where('is_active', false);
         }
 
-        if (! empty($filters['type'])) {
-            $query->where('item_type', $filters['type']);
+        $type = $filters['type'] ?? $filters['itemType'] ?? null;
+        if (! empty($type)) {
+            $query->where('item_type', (string) $type);
         }
 
-        if (! empty($filters['category'])) {
-            $query->where('category_code', strtoupper((string) $filters['category']));
+        $category = $filters['category'] ?? $filters['categoryCode'] ?? null;
+        if (! empty($category)) {
+            $query->where('category_code', strtoupper((string) $category));
+        }
+
+        $locationId = $filters['locationId'] ?? $filters['defaultLocationId'] ?? null;
+        if (! empty($locationId)) {
+            $query->where('default_location_id', (string) $locationId);
+        }
+
+        $supplierId = $filters['supplierId'] ?? $filters['defaultSupplierId'] ?? null;
+        if (! empty($supplierId)) {
+            $query->where('default_supplier_id', (string) $supplierId);
+        }
+
+        $policy = $filters['inventoryPolicy'] ?? $filters['policy'] ?? null;
+        if (! empty($policy)) {
+            $query->where('inventory_policy', (string) $policy);
+        }
+
+        $lotControlled = $filters['lotControlled'] ?? null;
+        if ($lotControlled === true || $lotControlled === 'true' || $lotControlled === '1') {
+            $query->where('lot_controlled', true);
+        } elseif ($lotControlled === false || $lotControlled === 'false' || $lotControlled === '0') {
+            $query->where('lot_controlled', false);
+        }
+
+        if (! empty($filters['sku'])) {
+            $query->whereRaw('LOWER(sku) LIKE ?', ['%'.strtolower(trim((string) $filters['sku'])).'%']);
         }
 
         if (! empty($filters['q'])) {

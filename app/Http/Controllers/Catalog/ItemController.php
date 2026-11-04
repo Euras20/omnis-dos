@@ -25,9 +25,15 @@ final class ItemController
     {
         return response()->json($this->listItemsQuery->execute([
             'q' => $request->query('q'),
-            'type' => $request->query('type'),
-            'category' => $request->query('category'),
+            'sku' => $request->query('sku'),
+            'type' => $request->query('type') ?? $request->query('itemType'),
+            'category' => $request->query('category') ?? $request->query('categoryCode'),
             'status' => $request->query('status'),
+            'isActive' => $request->query('isActive'),
+            'locationId' => $request->query('locationId') ?? $request->query('defaultLocationId'),
+            'supplierId' => $request->query('supplierId') ?? $request->query('defaultSupplierId'),
+            'inventoryPolicy' => $request->query('inventoryPolicy') ?? $request->query('policy'),
+            'lotControlled' => $request->query('lotControlled'),
             'limit' => $request->query('limit'),
             'offset' => $request->query('offset'),
         ]));

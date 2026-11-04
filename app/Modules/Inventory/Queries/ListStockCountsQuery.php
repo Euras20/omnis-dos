@@ -29,7 +29,7 @@ final class ListStockCountsQuery
         $limit = min(max((int) ($filters['limit'] ?? 50), 1), 200);
         $offset = max((int) ($filters['offset'] ?? 0), 0);
 
-        $q = StockCount::query()->with(['location']);
+        $q = StockCount::query()->with(['location', 'countedByUser', 'approvedByUser']);
 
         if (! empty($filters['status'])) {
             $q->where('status', (string) $filters['status']);
@@ -50,8 +50,14 @@ final class ListStockCountsQuery
                 'locationCode' => $c->location?->code,
                 'countDate' => $c->count_date?->format('Y-m-d'),
                 'status' => $c->status,
-                'countedBy' => $c->counted_by,
-                'approvedBy' => $c->approved_by,
+                'submittedBy' => $c->countedByUser?->display_name,
+                'submittedById' => $c->counted_by,
+                'submittedAt' => $c->counted_at?->toIso8601String(),
+                'supervisor' => $c->approvedByUser?->display_name,
+                'supervisorId' => $c->approved_by,
+                'approvedAt' => $c->approved_at?->toIso8601String(),
+                'countedBy' => $c->countedByUser?->display_name,
+                'approvedBy' => $c->approvedByUser?->display_name,
                 'memo' => $c->memo,
                 'createdAt' => $c->created_at?->toIso8601String(),
             ];
@@ -67,7 +73,10 @@ final class ListStockCountsQuery
     {
         $this->permissionChecker->assertCan($this->companyContext->userId(), 'stock.view');
 
-        $count = StockCount::query()->with(['lines.item', 'location'])->where('id', $id)->firstOrFail();
+        $count = StockCount::query()
+            ->with(['lines.item', 'location', 'countedByUser', 'approvedByUser'])
+            ->where('id', $id)
+            ->firstOrFail();
 
         return CreateStockCount::toArray($count);
     }

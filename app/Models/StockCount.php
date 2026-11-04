@@ -49,6 +49,16 @@ class StockCount extends Model
         return $this->belongsTo(Location::class, 'location_id');
     }
 
+    public function countedByUser(): BelongsTo
+    {
+        return $this->belongsTo(AppUser::class, 'counted_by');
+    }
+
+    public function approvedByUser(): BelongsTo
+    {
+        return $this->belongsTo(AppUser::class, 'approved_by');
+    }
+
     public function lines(): HasMany
     {
         return $this->hasMany(StockCountLine::class, 'stock_count_id')->orderBy('line_no');

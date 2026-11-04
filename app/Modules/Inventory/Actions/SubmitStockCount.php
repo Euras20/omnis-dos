@@ -55,7 +55,7 @@ final class SubmitStockCount
             );
 
             return CreateStockCount::toArray(
-                StockCount::query()->with(['lines.item', 'location'])->findOrFail($count->id)
+                StockCount::query()->with(['lines.item', 'location', 'countedByUser', 'approvedByUser'])->findOrFail($count->id)
             );
         });
     }
