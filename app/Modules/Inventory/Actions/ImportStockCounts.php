@@ -56,8 +56,11 @@ final class ImportStockCounts
         $locations = Location::query()
             ->where('company_id', $companyId)
             ->where('is_active', true)
-            ->get(['id', 'code']);
-        $locationByCode = $locations->keyBy(static fn ($location) => strtolower((string) $location->code));
+            ->get(['id', 'name']);
+        $locationByName = [];
+        foreach ($locations as $location) {
+            $locationByName[strtolower(trim((string) $location->name))] = $location;
+        }
 
         /** @var array<string, list<array<string, mixed>>> $byLocation */
         $byLocation = [];
@@ -76,13 +79,14 @@ final class ImportStockCounts
                 continue;
             }
 
-            if ($row['location_code'] === '') {
-                $errors[] = "Row {$lineNo}: location_code is required.";
+            $locationText = $row['location'];
+            if ($locationText === '') {
+                $errors[] = "Row {$lineNo}: location is required.";
                 continue;
             }
-            $location = $locationByCode->get(strtolower($row['location_code']));
+            $location = $locationByName[strtolower($locationText)] ?? null;
             if ($location === null) {
-                $errors[] = "Row {$lineNo}: location '{$row['location_code']}' not found.";
+                $errors[] = "Row {$lineNo}: location '{$locationText}' not found.";
                 continue;
             }
 
@@ -124,7 +128,7 @@ final class ImportStockCounts
     }
 
     /**
-     * @return list<array{line: int, item_id: string, sku: string, location_code: string, lot: string, counted_qty: string, reason: string}>
+     * @return list<array{line: int, item_id: string, sku: string, location: string, lot: string, counted_qty: string, reason: string}>
      */
     private function parse(string $csv): array
     {
@@ -140,11 +144,9 @@ final class ImportStockCounts
         }
         $header = array_map(static fn ($h) => strtolower(trim((string) $h)), $header);
         $index = array_flip($header);
-        foreach (['item_id', 'sku', 'location_code', 'counted_qty'] as $required) {
-            if (! isset($index[$required])) {
-                fclose($handle);
-                throw new BusinessRuleException("Missing column '{$required}'. Use the downloaded template.");
-            }
+        if (! isset($index['location'], $index['item_id'], $index['sku'], $index['counted_qty'])) {
+            fclose($handle);
+            throw new BusinessRuleException('Missing column. Need item_id, sku, location, counted_qty. location is the location name.');
         }
 
         $rows = [];
@@ -170,7 +172,7 @@ final class ImportStockCounts
                 'line' => $lineNo,
                 'item_id' => $value($cols, $index, 'item_id'),
                 'sku' => $value($cols, $index, 'sku'),
-                'location_code' => $value($cols, $index, 'location_code'),
+                'location' => $value($cols, $index, 'location'),
                 'lot' => $value($cols, $index, 'lot'),
                 'counted_qty' => $counted,
                 'reason' => $value($cols, $index, 'reason'),
