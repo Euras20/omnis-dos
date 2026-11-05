@@ -147,6 +147,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/stock/ledger', [StockController::class, 'ledger']);
         Route::get('/stock/traceability/{lot}', [StockController::class, 'traceability']);
         Route::get('/stock/transfers', [StockController::class, 'transfers']);
+        Route::get('/stock/counts/template', [StockController::class, 'countTemplate']);
         Route::get('/stock/counts', [StockController::class, 'counts']);
         Route::get('/stock/counts/{id}', [StockController::class, 'showCount']);
         Route::get('/tracking', [StockController::class, 'tracking']);
@@ -310,6 +311,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/stock/assignments/{id}/decide', [StockController::class, 'decideAssignment']);
             Route::post('/stock/transfers', [StockController::class, 'storeTransfer']);
             Route::post('/stock/transfers/bulk', [StockController::class, 'storeTransfersBulk']);
+            Route::post('/stock/counts/import', [StockController::class, 'importCount']);
             Route::post('/stock/counts', [StockController::class, 'storeCount']);
             Route::post('/stock/counts/{id}/submit', [StockController::class, 'submitCount']);
             Route::post('/stock/counts/{id}/approve', [StockController::class, 'approveCount']);

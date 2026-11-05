@@ -8543,6 +8543,89 @@
         }
       }
     },
+    "/stock/counts/template": {
+      "get": {
+        "tags": ["Inventory"],
+        "summary": "Download stock-count CSV for items still missing a location or a counted quantity",
+        "description": "CSV (UTF-8, opens in Excel). Only active items that are not already on a non-rejected count with a location and a counted quantity. Columns: item_id, sku, name (prefilled); location_code and counted_qty (blank, required on upload); lot and reason (blank, optional). Permission: stock.view.",
+        "operationId": "stockCountTemplate",
+        "responses": {
+          "200": {
+            "description": "CSV file stock-count-template.csv",
+            "content": {
+              "text/csv": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/stock/counts/import": {
+      "post": {
+        "tags": ["Inventory"],
+        "summary": "Upload the filled stock-count sheet",
+        "description": "multipart/form-data. Groups filled rows by location_code and opens one draft count per location via the normal count create. Blank counted_qty rows are skipped. All or nothing: a bad row creates nothing. location_code and counted_qty are required. lot and reason are optional. Book quantity is snapshotted by the server. Permission: stock.move. Does not change existing counts.",
+        "operationId": "importStockCounts",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Filled CSV saved from the template. Columns: item_id, sku, name, location_code, lot, counted_qty, reason."
+                  },
+                  "countDate": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Optional. YYYY-MM-DD. Defaults to today."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Draft counts created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "countDate": { "type": "string", "format": "date" },
+                    "sheets": { "type": "integer", "description": "One draft count per location" },
+                    "lines": { "type": "integer" },
+                    "counts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string", "format": "uuid" },
+                          "countNo": { "type": "string" },
+                          "status": { "type": "string", "example": "draft" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
     "/stock/counts": {
       "get": {
         "tags": [

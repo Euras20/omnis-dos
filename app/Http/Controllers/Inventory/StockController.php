@@ -8,6 +8,7 @@ use App\Http\Requests\Inventory\ApproveStockCountRequest;
 use App\Http\Requests\Inventory\BulkAssignmentRequest;
 use App\Http\Requests\Inventory\BulkStockTransferRequest;
 use App\Http\Requests\Inventory\DecideAssignmentRequest;
+use App\Http\Requests\Inventory\ImportStockCountRequest;
 use App\Http\Requests\Inventory\StoreAssignmentRequest;
 use App\Http\Requests\Inventory\StoreStockCountRequest;
 use App\Http\Requests\Inventory\StoreStockTransferRequest;
@@ -23,10 +24,12 @@ use App\Modules\Inventory\Queries\ListStockMovementsQuery;
 use App\Modules\Inventory\Queries\ListStockTransfersQuery;
 use App\Modules\Inventory\Queries\LowStockAlertQuery;
 use App\Modules\Inventory\Queries\OrderTrackingQuery;
+use App\Modules\Inventory\Queries\StockCountTemplateQuery;
 use App\Modules\Inventory\Queries\StockOnHandQuery;
 use App\Modules\Inventory\Queries\TraceabilityQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 final class StockController
 {
@@ -43,6 +46,8 @@ final class StockController
         private readonly CreateStockCount $createStockCount,
         private readonly SubmitStockCount $submitStockCount,
         private readonly ApproveStockCount $approveStockCount,
+        private readonly StockCountTemplateQuery $stockCountTemplateQuery,
+        private readonly ImportStockCounts $importStockCounts,
         private readonly OrderTrackingQuery $orderTrackingQuery,
         private readonly LowStockAlertQuery $lowStockAlertQuery,
     ) {
@@ -131,6 +136,27 @@ final class StockController
     public function storeTransfersBulk(BulkStockTransferRequest $request): JsonResponse
     {
         return response()->json($this->postStockTransfer->executeBulk($request->validated()), 201);
+    }
+
+    public function countTemplate(): Response
+    {
+        $csv = $this->stockCountTemplateQuery->csv();
+
+        return response($csv, 200, [
+            'Content-Type' => 'text/csv; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="stock-count-template.csv"',
+        ]);
+    }
+
+    public function importCount(ImportStockCountRequest $request): JsonResponse
+    {
+        $file = $request->file('file');
+        $csv = $file !== null ? (string) file_get_contents($file->getRealPath()) : '';
+
+        return response()->json(
+            $this->importStockCounts->execute($csv, $request->validated()['countDate'] ?? null),
+            201,
+        );
     }
 
     public function counts(Request $request): JsonResponse
