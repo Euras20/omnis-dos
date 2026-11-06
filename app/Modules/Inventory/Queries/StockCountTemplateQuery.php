@@ -50,7 +50,7 @@ final class StockCountTemplateQuery
 
         $out = fopen('php://temp', 'r+');
         fwrite($out, "\xEF\xBB\xBF");
-        fputcsv($out, ['item_id', 'sku', 'name', 'location_code', 'lot', 'counted_qty', 'reason']);
+        fputcsv($out, ['item_id', 'sku', 'name', 'location', 'lot', 'counted_qty', 'reason']);
 
         foreach ($items as $item) {
             fputcsv($out, [
