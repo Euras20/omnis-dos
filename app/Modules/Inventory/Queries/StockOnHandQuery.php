@@ -39,34 +39,34 @@ final class StockOnHandQuery
         $limit = min(max((int) ($filters['limit'] ?? 100), 1), 500);
         $offset = max((int) ($filters['offset'] ?? 0), 0);
 
-        $params = [$companyId];
+        $joinOn = 'sa.item_id = i.id AND sa.company_id = i.company_id';
+        $joinParams = [];
+        if ($locationId !== null && $locationId !== '') {
+            $joinOn .= ' AND sa.location_id = ?';
+            $joinParams[] = $locationId;
+        }
+        if ($lot !== null && $lot !== '') {
+            $joinOn .= ' AND sa.lot = ?';
+            $joinParams[] = $lot;
+        }
+
         $where = [
             'i.company_id = ?',
             'i.is_active = true',
             "i.item_type <> 'Service'",
             "COALESCE(i.inventory_policy, '') <> 'Service'",
         ];
-
-        $joinOn = 'sa.item_id = i.id AND sa.company_id = i.company_id';
-        if ($locationId !== null && $locationId !== '') {
-            $joinOn .= ' AND sa.location_id = ?';
-            $params[] = $locationId;
-        }
-        if ($lot !== null && $lot !== '') {
-            $joinOn .= ' AND sa.lot = ?';
-            $params[] = $lot;
-        }
-
+        $whereParams = [$companyId];
         if ($itemId !== null && $itemId !== '') {
             $where[] = 'i.id = ?';
-            $params[] = $itemId;
+            $whereParams[] = $itemId;
         }
         if ($q !== null && $q !== '') {
             $where[] = '(i.sku ILIKE ? OR i.name ILIKE ? OR sa.lot ILIKE ?)';
             $like = '%'.$q.'%';
-            $params[] = $like;
-            $params[] = $like;
-            $params[] = $like;
+            $whereParams[] = $like;
+            $whereParams[] = $like;
+            $whereParams[] = $like;
         }
 
         $whereSql = implode(' AND ', $where);
@@ -77,6 +77,9 @@ final class StockOnHandQuery
             LEFT JOIN location l ON l.id = sa.location_id
             WHERE {$whereSql}
         ";
+
+        // Join placeholders come before the WHERE placeholders.
+        $params = array_merge($joinParams, $whereParams);
 
         $countRow = DB::selectOne("SELECT COUNT(*) AS c {$fromSql}", $params);
         $total = (int) ($countRow->c ?? 0);
