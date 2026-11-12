@@ -114,6 +114,9 @@ final class CreateRfq
             'status' => $rfq->status,
             'awardedBidId' => $rfq->awarded_bid_id,
             'awardedPurchaseOrderId' => $rfq->awarded_purchase_order_id,
+            'awardedPurchaseOrderNo' => $rfq->relationLoaded('awardedPurchaseOrder')
+                ? $rfq->awardedPurchaseOrder?->po_no
+                : null,
             'memo' => $rfq->memo,
             'lines' => $rfq->lines->map(static fn (RfqLine $l) => [
                 'id' => $l->id,
@@ -124,14 +127,25 @@ final class CreateRfq
                 'unit' => $l->unit,
             ])->all(),
             'bids' => $rfq->relationLoaded('bids')
-                ? $rfq->bids->map(static fn ($b) => [
-                    'id' => $b->id,
-                    'supplierId' => $b->supplier_id,
-                    'bidDate' => $b->bid_date?->format('Y-m-d'),
-                    'totalMinor' => $b->total_minor,
-                    'status' => $b->status,
-                    'currency' => $b->currency,
-                ])->all()
+                ? $rfq->bids->map(static function ($b) {
+                    $prices = is_array($b->line_prices) ? $b->line_prices : [];
+
+                    return [
+                        'id' => $b->id,
+                        'supplierId' => $b->supplier_id,
+                        'supplierName' => $b->relationLoaded('supplier') ? $b->supplier?->name : null,
+                        'supplierCode' => $b->relationLoaded('supplier') ? $b->supplier?->code : null,
+                        'bidDate' => $b->bid_date?->format('Y-m-d'),
+                        'totalMinor' => $b->total_minor,
+                        'leadTimeDays' => $b->lead_time_days,
+                        'status' => $b->status,
+                        'currency' => $b->currency,
+                        'linePrices' => array_map(static fn ($p) => [
+                            'rfqLineId' => $p['rfqLineId'] ?? $p['rfq_line_id'] ?? null,
+                            'unitPriceMinor' => isset($p['unitPriceMinor']) ? (int) $p['unitPriceMinor'] : (isset($p['unit_price_minor']) ? (int) $p['unit_price_minor'] : null),
+                        ], $prices),
+                    ];
+                })->all()
                 : [],
         ];
     }

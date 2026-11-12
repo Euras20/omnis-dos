@@ -217,6 +217,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/goods-receipts/{id}', [GoodsReceiptController::class, 'show']);
         Route::get('/requisitions', [RequisitionController::class, 'index']);
         Route::get('/rfqs', [RfqController::class, 'index']);
+        Route::get('/rfqs/{id}', [RfqController::class, 'show']);
 
         // --- Documents ---
         Route::get('/documents/purchase-orders/{id}', [DocumentController::class, 'purchaseOrder']);

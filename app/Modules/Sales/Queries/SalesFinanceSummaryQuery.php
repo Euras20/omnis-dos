@@ -78,7 +78,7 @@ final class SalesFinanceSummaryQuery
             ->sum('total_minor');
 
         $confirmed = SalesOrder::query()
-            ->with('lines')
+            ->with(['lines', 'customer'])
             ->where('company_id', $companyId)
             ->where('status', 'confirmed')
             ->orderByDesc('order_date')
@@ -95,6 +95,7 @@ final class SalesFinanceSummaryQuery
                 'id' => $order->id,
                 'orderNo' => $order->order_no,
                 'customerId' => $order->customer_id,
+                'customerName' => $order->customer?->name,
                 'orderDate' => $order->order_date?->toDateString(),
                 'requiredDate' => $order->required_date?->toDateString(),
                 'currency' => $order->currency,

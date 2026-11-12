@@ -26,7 +26,7 @@ final class PublicQuotationController extends Controller
             abort(403, 'Invalid download link.');
         }
 
-        $quotation = Quotation::query()->withoutGlobalScopes()->with('lines')->where('id', $id)->first();
+        $quotation = Quotation::query()->withoutGlobalScopes()->with(['lines.item'])->where('id', $id)->first();
         if ($quotation === null) {
             abort(404);
         }
@@ -40,7 +40,7 @@ final class PublicQuotationController extends Controller
             ->orderBy('bank_name')
             ->get();
 
-        $doc = QuotationDocument::build($quotation, $customer, $company, $banks, $request->fullUrl());
+        $doc = QuotationDocument::build($quotation, $customer, $company, $banks);
 
         return response($doc['pdf'], 200, [
             'Content-Type' => 'application/pdf',

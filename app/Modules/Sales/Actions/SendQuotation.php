@@ -46,7 +46,7 @@ final class SendQuotation
 
         return DB::transaction(function () use ($id, $companyId, $actorId, $data) {
             $quotation = Quotation::query()
-                ->with('lines')
+                ->with(['lines.item'])
                 ->where('company_id', $companyId)
                 ->where('id', $id)
                 ->lockForUpdate()
@@ -78,9 +78,7 @@ final class SendQuotation
                 ->get();
 
             $company = Company::query()->where('id', $companyId)->firstOrFail();
-            $downloadUrl = rtrim((string) config('app.url'), '/')
-                .'/api/v1/public/quotations/'.$quotation->id.'/pdf?token='.QuotationDocument::token($quotation->id);
-            $doc = QuotationDocument::build($quotation, $customer, $company, $banks, $downloadUrl);
+            $doc = QuotationDocument::build($quotation, $customer, $company, $banks);
 
             $document = $this->storePdf($doc['pdf'], $quotation, $companyId, $actorId);
 

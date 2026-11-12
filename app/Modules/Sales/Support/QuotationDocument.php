@@ -19,7 +19,7 @@ final class QuotationDocument
      * @param  \Illuminate\Support\Collection<int, CompanyBankAccount>  $banks
      * @return array{html: string, pdf: string}
      */
-    public static function build(Quotation $quotation, ?Party $customer, Company $company, $banks, string $downloadUrl): array
+    public static function build(Quotation $quotation, ?Party $customer, Company $company, $banks): array
     {
         $currency = (string) ($quotation->currency ?: 'GHS');
         $money = static fn (int $minor): string => number_format($minor / 100, 2);

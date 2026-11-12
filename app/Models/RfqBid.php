@@ -26,6 +26,7 @@ class RfqBid extends Model
         'bid_date',
         'currency',
         'total_minor',
+        'lead_time_days',
         'status',
         'line_prices',
         'memo',

@@ -86,6 +86,9 @@ final class SubmitRfqBid
                 'bid_date' => (string) ($data['bidDate'] ?? date('Y-m-d')),
                 'currency' => strtoupper((string) ($data['currency'] ?? 'GHS')),
                 'total_minor' => $total,
+                'lead_time_days' => isset($data['leadTimeDays']) && $data['leadTimeDays'] !== ''
+                    ? (int) $data['leadTimeDays']
+                    : null,
                 'status' => 'submitted',
                 'line_prices' => $data['linePrices'] ?? null,
                 'memo' => isset($data['memo']) ? trim((string) $data['memo']) : null,
@@ -112,6 +115,8 @@ final class SubmitRfqBid
                 'rfqId' => $rfqId,
                 'supplierId' => $supplierId,
                 'totalMinor' => $total,
+                'leadTimeDays' => $bid->lead_time_days,
+                'linePrices' => $bid->line_prices ?? [],
                 'status' => $bid->status,
             ];
         });

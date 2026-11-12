@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Procurement\Queries;
 
+use App\Exceptions\NotFoundException;
 use App\Models\Rfq;
 use App\Modules\Procurement\Actions\CreateRfq;
 use App\Shared\Company\CompanyContext;
@@ -30,7 +31,7 @@ final class ListRfqsQuery
         $offset = max((int) ($filters['offset'] ?? 0), 0);
 
         $q = Rfq::query()
-            ->with(['lines', 'bids'])
+            ->with(['lines', 'bids.supplier', 'awardedPurchaseOrder'])
             ->where('company_id', $companyId)
             ->orderByDesc('issue_date')
             ->orderByDesc('created_at');
@@ -46,5 +47,24 @@ final class ListRfqsQuery
             'data' => $rows->map(static fn (Rfq $r) => CreateRfq::toArray($r))->all(),
             'total' => $total,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function get(string $id): array
+    {
+        $this->permissionChecker->assertCan($this->companyContext->userId(), 'po.view');
+
+        $rfq = Rfq::query()
+            ->with(['lines', 'bids.supplier', 'awardedPurchaseOrder'])
+            ->where('company_id', $this->companyContext->companyId())
+            ->where('id', $id)
+            ->first();
+        if ($rfq === null) {
+            throw new NotFoundException('RFQ not found.');
+        }
+
+        return CreateRfq::toArray($rfq);
     }
 }

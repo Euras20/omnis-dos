@@ -30,6 +30,11 @@ final class RfqController
         ]));
     }
 
+    public function show(string $id): JsonResponse
+    {
+        return response()->json($this->listRfqsQuery->get($id));
+    }
+
     public function store(Request $request): JsonResponse
     {
         return response()->json($this->createRfq->execute($request->all()), 201);

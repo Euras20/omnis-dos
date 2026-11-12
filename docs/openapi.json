@@ -7567,6 +7567,7 @@
           "Reporting"
         ],
         "summary": "Sales finance summary",
+        "description": "confirmedOrders include customerId and customerName.",
         "operationId": "salesSummary",
         "parameters": [
           {
@@ -9150,8 +9151,16 @@
           "Procurement"
         ],
         "summary": "List RFQs",
+        "description": "Filter with ?status=open|closed|awarded|cancelled. Each bid includes linePrices (rfqLineId, unitPriceMinor), supplierName, supplierCode and leadTimeDays. Awarded RFQs include awardedPurchaseOrderNo next to awardedPurchaseOrderId.",
         "operationId": "listRfqs",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["open", "closed", "awarded", "cancelled"] }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK"
@@ -9195,6 +9204,22 @@
               }
             }
           }
+        }
+      }
+    },
+    "/rfqs/{id}": {
+      "get": {
+        "tags": ["Procurement"],
+        "summary": "RFQ detail",
+        "description": "Same shape as a list item: lines, bids with linePrices, supplierName, supplierCode, leadTimeDays, and awardedPurchaseOrderNo.",
+        "operationId": "getRfq",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "OK" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
     },

@@ -60,6 +60,8 @@ final class SalesFinanceActivityQuery
                     'id' => $r->id,
                     'no' => $r->quotation_no,
                     'customerId' => $r->customer_id,
+                    'customerName' => null,
+                    'currency' => $r->currency,
                     'amountMinor' => (int) $r->gross_minor,
                     'status' => $r->status,
                 ];
@@ -84,6 +86,8 @@ final class SalesFinanceActivityQuery
                     'id' => $r->id,
                     'no' => $r->order_no,
                     'customerId' => $r->customer_id,
+                    'customerName' => null,
+                    'currency' => $r->currency,
                     'amountMinor' => (int) $r->gross_minor,
                     'status' => $r->status,
                 ];
@@ -108,6 +112,8 @@ final class SalesFinanceActivityQuery
                     'id' => $r->id,
                     'no' => $r->invoice_no,
                     'customerId' => $r->customer_id,
+                    'customerName' => null,
+                    'currency' => $r->currency,
                     'amountMinor' => (int) $r->gross_minor,
                     'status' => $r->status,
                 ];
@@ -136,6 +142,8 @@ final class SalesFinanceActivityQuery
                     'id' => $r->id,
                     'no' => $r->credit_no,
                     'customerId' => $customerId,
+                    'customerName' => null,
+                    'currency' => $r->currency,
                     'amountMinor' => -1 * (int) $r->gross_minor,
                     'status' => 'posted',
                 ];
@@ -157,6 +165,8 @@ final class SalesFinanceActivityQuery
                     'id' => $r->id,
                     'no' => $r->receipt_no,
                     'customerId' => $r->customer_id,
+                    'customerName' => null,
+                    'currency' => $r->currency,
                     'amountMinor' => (int) $r->total_minor,
                     'status' => 'banked',
                 ];
@@ -164,6 +174,17 @@ final class SalesFinanceActivityQuery
         }
 
         usort($rows, static fn (array $a, array $b) => strcmp((string) $b['date'], (string) $a['date']));
+
+        $customerIds = array_values(array_unique(array_filter(array_column($rows, 'customerId'))));
+        $names = $customerIds === []
+            ? collect()
+            : DB::table('party')->whereIn('id', $customerIds)->pluck('name', 'id');
+        foreach ($rows as &$row) {
+            $row['customerName'] = $row['customerId'] !== null
+                ? ($names[$row['customerId']] ?? null)
+                : null;
+        }
+        unset($row);
 
         $total = count($rows);
         $page = array_slice($rows, $offset, $limit);
