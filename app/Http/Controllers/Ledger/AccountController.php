@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Ledger;
 
+use App\Http\Requests\Ledger\MapAccountRoleRequest;
 use App\Http\Requests\Ledger\StoreAccountRequest;
 use App\Http\Requests\Ledger\UpdateAccountRequest;
 use App\Modules\Ledger\Actions\CreateAccount;
+use App\Modules\Ledger\Actions\MapAccountRole;
 use App\Modules\Ledger\Actions\UpdateAccount;
+use App\Modules\Ledger\Queries\AccountTreeQuery;
+use App\Modules\Ledger\Queries\ListAccountRolesQuery;
 use App\Modules\Ledger\Queries\ListAccountsQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,8 +20,11 @@ final class AccountController
 {
     public function __construct(
         private readonly ListAccountsQuery $listAccountsQuery,
+        private readonly AccountTreeQuery $accountTreeQuery,
+        private readonly ListAccountRolesQuery $listAccountRolesQuery,
         private readonly CreateAccount $createAccount,
         private readonly UpdateAccount $updateAccount,
+        private readonly MapAccountRole $mapAccountRole,
     ) {
     }
 
@@ -33,6 +40,21 @@ final class AccountController
         ]);
 
         return response()->json($result);
+    }
+
+    public function tree(): JsonResponse
+    {
+        return response()->json($this->accountTreeQuery->execute());
+    }
+
+    public function roles(): JsonResponse
+    {
+        return response()->json($this->listAccountRolesQuery->execute());
+    }
+
+    public function mapRole(string $roleKey, MapAccountRoleRequest $request): JsonResponse
+    {
+        return response()->json($this->mapAccountRole->execute($roleKey, $request->validated()));
     }
 
     public function store(StoreAccountRequest $request): JsonResponse

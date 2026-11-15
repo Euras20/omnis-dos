@@ -18,6 +18,7 @@ use App\Modules\Ledger\Domain\PostingLine;
 use App\Modules\Ledger\Domain\PostingRequest;
 use App\Shared\Audit\AuditWriter;
 use App\Shared\PeriodLock\PeriodLockChecker;
+use App\Shared\Permissions\PermissionChecker;
 use App\Shared\Support\Uuid;
 use Illuminate\Support\Facades\DB;
 
@@ -32,6 +33,7 @@ final class PostingService
     public function __construct(
         private readonly PeriodLockChecker $periodLockChecker,
         private readonly AuditWriter $auditWriter,
+        private readonly PermissionChecker $permissionChecker,
     ) {
     }
 
@@ -214,7 +216,11 @@ final class PostingService
             throw new BusinessRuleException('Only manual journals are posted via this path.');
         }
 
-        if ($journal->prepared_by !== null && $journal->prepared_by === $actorId) {
+        if (
+            $journal->prepared_by !== null
+            && $journal->prepared_by === $actorId
+            && ! $this->permissionChecker->isSystemAdministrator($actorId)
+        ) {
             throw new \App\Exceptions\SodViolationException(
                 'The preparer of a journal cannot post it (segregation of duties).'
             );

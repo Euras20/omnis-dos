@@ -12,6 +12,7 @@ use App\Modules\Ledger\Domain\PostingKey;
 use App\Modules\Ledger\Domain\PostingLine;
 use App\Modules\Ledger\Domain\PostingRequest;
 use App\Modules\Ledger\Services\PostingService;
+use App\Modules\Ledger\Services\RoleResolver;
 use App\Shared\Audit\AuditWriter;
 use App\Shared\Company\CompanyContext;
 use App\Shared\Permissions\PermissionChecker;
@@ -26,6 +27,7 @@ final class PostPayrollRun
 {
     public function __construct(
         private readonly CompanyContext $companyContext,
+        private readonly RoleResolver $roleResolver,
         private readonly PermissionChecker $permissionChecker,
         private readonly PostingService $postingService,
         private readonly PeriodLockChecker $periodLockChecker,
@@ -153,26 +155,12 @@ final class PostPayrollRun
      */
     private function resolveAccounts(string $companyId): array
     {
-        $codes = [
-            'wages' => '5100',
-            'ssfEmployer' => '5110',
-            'paye' => '2200',
-            'ssfPayable' => '2210',
-            'netPay' => '2220',
+        return [
+            'wages' => $this->roleResolver->id($companyId, 'WAGES'),
+            'ssfEmployer' => $this->roleResolver->id($companyId, 'EMPLOYER_SSF'),
+            'paye' => $this->roleResolver->id($companyId, 'PAYE_PAYABLE'),
+            'ssfPayable' => $this->roleResolver->id($companyId, 'SSF_PAYABLE'),
+            'netPay' => $this->roleResolver->id($companyId, 'NET_PAY'),
         ];
-        $out = [];
-        foreach ($codes as $key => $code) {
-            $acc = Account::query()
-                ->where('company_id', $companyId)
-                ->where('code', $code)
-                ->where('is_active', true)
-                ->first();
-            if ($acc === null) {
-                throw new BusinessRuleException("Required account {$code} not found for payroll posting.");
-            }
-            $out[$key] = $acc->id;
-        }
-
-        return $out;
     }
 }

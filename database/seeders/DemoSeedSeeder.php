@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Modules\Identity\Domain\PermissionCatalogue;
+use App\Modules\Ledger\Services\SeedSystemGroups;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -49,6 +50,7 @@ final class DemoSeedSeeder extends Seeder
 
         DB::transaction(function () use ($now): void {
             $this->seedCompany($now);
+            app(SeedSystemGroups::class)->seed(self::COMPANY_ID);
             $this->seedRoles($now);
             $this->seedAdminUser($now);
             $this->seedCustomerParty($now);
@@ -122,6 +124,23 @@ final class DemoSeedSeeder extends Seeder
                 $permissions
             );
             DB::table('role_permission')->insert($rows);
+        } else {
+            // Keep the system admin role complete if the catalogue grows.
+            $existing = DB::table('role_permission')
+                ->where('role_id', self::ADMIN_ROLE_ID)
+                ->pluck('permission')
+                ->all();
+            $missing = array_values(array_diff(PermissionCatalogue::codes(), $existing));
+            if ($missing !== []) {
+                $rows = array_map(
+                    static fn (string $code): array => [
+                        'role_id' => self::ADMIN_ROLE_ID,
+                        'permission' => $code,
+                    ],
+                    $missing
+                );
+                DB::table('role_permission')->insert($rows);
+            }
         }
 
         // Customer portal role

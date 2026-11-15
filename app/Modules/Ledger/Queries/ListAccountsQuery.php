@@ -35,7 +35,8 @@ final class ListAccountsQuery
 
         $query = Account::query()
             ->where('company_id', $companyId)
-            ->orderBy('code');
+            ->orderByRaw('level nulls last')
+            ->orderBy('name');
 
         if (isset($filters['category']) && is_string($filters['category'])) {
             $query->where('category', strtolower($filters['category']));
@@ -91,15 +92,23 @@ final class ListAccountsQuery
 
             $items[] = [
                 'id' => $account->id,
+                'parentId' => $account->parent_id,
+                'systemKey' => $account->system_key,
                 'code' => $account->code,
                 'name' => $account->name,
                 'category' => $account->category,
                 'kind' => $account->kind,
+                'nodeType' => $account->node_type ?? 'POSTING',
+                'source' => $account->source ?? 'CLIENT',
+                'isPostable' => ($account->node_type ?? 'POSTING') === 'POSTING',
                 'currency' => $account->currency,
                 'isActive' => $account->is_active,
                 'fsLineItem' => $account->fs_line_item,
                 'fsSubLine' => $account->fs_sub_line,
                 'normalBalance' => $account->normal_balance,
+                'statement' => $account->statement,
+                'reportSection' => $account->report_section,
+                'level' => $account->level,
                 'balanceMinor' => $balanceMinor,
                 'debitMinor' => $debit,
                 'creditMinor' => $credit,

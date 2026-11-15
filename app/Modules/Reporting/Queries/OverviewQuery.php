@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Reporting\Queries;
 
 use App\Models\AppUser;
+use App\Modules\Ledger\Services\RoleResolver;
 use App\Shared\Company\CompanyContext;
 use Illuminate\Support\Facades\DB;
 
@@ -12,33 +13,33 @@ use Illuminate\Support\Facades\DB;
  * GET /api/v1/overview
  *
  * One payload for the executive overview (first page after login).
- * Figures come from posted journals, open invoices, orders, stock and deliveries.
+ * Revenue is the income class. COGS and cash come from the mapped roles.
  * Customer portal users receive an empty payload.
  */
 final class OverviewQuery
 {
     public function __construct(
         private readonly CompanyContext $companyContext,
+        private readonly RoleResolver $roleResolver,
     ) {
     }
 
     /**
-     * @param  array{asOf?: ?string}  $filters
+     * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
     public function execute(array $filters = []): array
     {
-        $actorId = $this->companyContext->userId();
+        $user = AppUser::query()->find($this->companyContext->userId());
+        if ($user !== null && $user->user_type === 'portal') {
+            return $this->empty();
+        }
+
         $companyId = $this->companyContext->companyId();
         $asOf = isset($filters['asOf']) && is_string($filters['asOf']) && $filters['asOf'] !== ''
             ? $filters['asOf']
             : now()->toDateString();
         $monthStart = substr($asOf, 0, 7).'-01';
-
-        $actor = AppUser::query()->where('id', $actorId)->first();
-        if ($actor !== null && $actor->isPortal()) {
-            return $this->empty($asOf, $monthStart);
-        }
 
         $orderCounts = DB::table('sales_order')
             ->where('company_id', $companyId)
@@ -63,12 +64,18 @@ final class OverviewQuery
             ->where('status', 'pending')
             ->count();
 
-        $revenue = $this->accountNet($companyId, $monthStart, $asOf, ['4000', '4100']);
-        $cogsCredit = $this->accountNet($companyId, $monthStart, $asOf, ['5000']);
-        $cogs = -1 * $cogsCredit;
+        $revenue = $this->classNet($companyId, $monthStart, $asOf, 'income');
+        $cogsAccount = $this->roleResolver->idOrNull($companyId, 'COGS');
+        $cogs = $cogsAccount !== null
+            ? -1 * $this->accountNet($companyId, $monthStart, $asOf, [$cogsAccount])
+            : 0;
         $gross = $revenue - $cogs;
 
-        $cash = $this->balanceAsOf($companyId, $asOf, ['1000', '1010', '1050']);
+        $cashAccount = $this->roleResolver->idOrNull($companyId, 'BANK_CASH');
+        $cash = $cashAccount !== null
+            ? $this->balanceAsOf($companyId, $asOf, [$cashAccount])
+            : 0;
+
         $stockValue = (int) DB::table('stock_on_hand')
             ->where('company_id', $companyId)
             ->sum('value_minor');
@@ -86,8 +93,6 @@ final class OverviewQuery
             ->selectRaw('status, COUNT(*)::int AS n')
             ->groupBy('status')
             ->pluck('n', 'status');
-
-        $delivery = $this->deliveryPerformance($companyId, $asOf);
 
         return [
             'asOf' => $asOf,
@@ -113,16 +118,14 @@ final class OverviewQuery
             'stockValueMinor' => $stockValue,
             'receivablesOverdueMinor' => $overdue,
             'purchaseOrdersByStatus' => $poCounts->map(static fn ($n) => (int) $n)->all(),
-            'delivery' => $delivery,
+            'delivery' => $this->deliveryPerformance($companyId, $asOf),
         ];
     }
 
     /**
-     * Net (credit − debit) for the given account codes over a date range, posted journals only.
-     *
-     * @param  list<string>  $codes
+     * Credit − debit for every posting account in a class.
      */
-    private function accountNet(string $companyId, string $from, string $to, array $codes): int
+    private function classNet(string $companyId, string $from, string $to, string $category): int
     {
         $row = DB::table('journal_line')
             ->join('journal', 'journal.id', '=', 'journal_line.journal_id')
@@ -130,7 +133,8 @@ final class OverviewQuery
             ->where('journal_line.company_id', $companyId)
             ->where('journal.status', 'posted')
             ->whereBetween('journal.posting_date', [$from, $to])
-            ->whereIn('account.code', $codes)
+            ->where('account.category', $category)
+            ->where('account.node_type', 'POSTING')
             ->selectRaw('COALESCE(SUM(journal_line.credit_minor - journal_line.debit_minor), 0) AS net')
             ->first();
 
@@ -138,19 +142,33 @@ final class OverviewQuery
     }
 
     /**
-     * Book balance (debit − credit) as at a date for the given account codes.
-     *
-     * @param  list<string>  $codes
+     * @param  list<string>  $accountIds
      */
-    private function balanceAsOf(string $companyId, string $asOf, array $codes): int
+    private function accountNet(string $companyId, string $from, string $to, array $accountIds): int
     {
         $row = DB::table('journal_line')
             ->join('journal', 'journal.id', '=', 'journal_line.journal_id')
-            ->join('account', 'account.id', '=', 'journal_line.account_id')
+            ->where('journal_line.company_id', $companyId)
+            ->where('journal.status', 'posted')
+            ->whereBetween('journal.posting_date', [$from, $to])
+            ->whereIn('journal_line.account_id', $accountIds)
+            ->selectRaw('COALESCE(SUM(journal_line.credit_minor - journal_line.debit_minor), 0) AS net')
+            ->first();
+
+        return (int) ($row->net ?? 0);
+    }
+
+    /**
+     * @param  list<string>  $accountIds
+     */
+    private function balanceAsOf(string $companyId, string $asOf, array $accountIds): int
+    {
+        $row = DB::table('journal_line')
+            ->join('journal', 'journal.id', '=', 'journal_line.journal_id')
             ->where('journal_line.company_id', $companyId)
             ->where('journal.status', 'posted')
             ->where('journal.posting_date', '<=', $asOf)
-            ->whereIn('account.code', $codes)
+            ->whereIn('journal_line.account_id', $accountIds)
             ->selectRaw('COALESCE(SUM(journal_line.debit_minor - journal_line.credit_minor), 0) AS bal')
             ->first();
 
@@ -166,68 +184,46 @@ final class OverviewQuery
             ->leftJoin('sales_order', 'sales_order.id', '=', 'delivery_note.sales_order_id')
             ->where('delivery_note.company_id', $companyId)
             ->whereIn('delivery_note.status', ['delivered', 'failed'])
-            ->get(['delivery_note.status', 'delivery_note.delivered_at', 'sales_order.required_date']);
+            ->whereDate('delivery_note.updated_at', '<=', $asOf)
+            ->select('delivery_note.status', 'delivery_note.delivered_at', 'sales_order.required_date')
+            ->get();
 
         $delivered = 0;
         $onTime = 0;
         $late = 0;
         $failed = 0;
-
         foreach ($rows as $row) {
             if ($row->status === 'failed') {
                 $failed++;
                 continue;
             }
             $delivered++;
-            $deliveredDate = $row->delivered_at !== null ? substr((string) $row->delivered_at, 0, 10) : $asOf;
-            $promise = $row->required_date !== null ? substr((string) $row->required_date, 0, 10) : null;
-            if ($promise !== null && $deliveredDate <= $promise) {
-                $onTime++;
-            } else {
+            if ($row->required_date !== null && $row->delivered_at !== null && $row->delivered_at > $row->required_date) {
                 $late++;
+            } else {
+                $onTime++;
             }
         }
 
-        return [
-            'delivered' => $delivered,
-            'onTime' => $onTime,
-            'late' => $late,
-            'failed' => $failed,
-        ];
+        return compact('delivered', 'onTime', 'late', 'failed');
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function empty(string $asOf, string $monthStart): array
+    private function empty(): array
     {
         return [
-            'asOf' => $asOf,
-            'period' => ['from' => $monthStart, 'to' => $asOf],
-            'orders' => [
-                'total' => 0,
-                'open' => 0,
-                'delayed' => 0,
-                'awaitingApproval' => 0,
-                'byStage' => [],
-            ],
+            'asOf' => now()->toDateString(),
+            'period' => ['from' => null, 'to' => null],
+            'orders' => ['total' => 0, 'open' => 0, 'delayed' => 0, 'awaitingApproval' => 0, 'byStage' => []],
             'assignmentsAwaiting' => 0,
-            'month' => [
-                'revenueMinor' => 0,
-                'cogsMinor' => 0,
-                'grossProfitMinor' => 0,
-                'grossMarginPercent' => null,
-            ],
+            'month' => ['revenueMinor' => 0, 'cogsMinor' => 0, 'grossProfitMinor' => 0, 'grossMarginPercent' => null],
             'cashMinor' => 0,
             'stockValueMinor' => 0,
             'receivablesOverdueMinor' => 0,
             'purchaseOrdersByStatus' => [],
-            'delivery' => [
-                'delivered' => 0,
-                'onTime' => 0,
-                'late' => 0,
-                'failed' => 0,
-            ],
+            'delivery' => ['delivered' => 0, 'onTime' => 0, 'late' => 0, 'failed' => 0],
         ];
     }
 }

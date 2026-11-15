@@ -111,6 +111,8 @@ Route::prefix('v1')->group(function () {
 
         // --- Ledger: queries ---
         Route::get('/accounts', [AccountController::class, 'index']);
+        Route::get('/accounts/tree', [AccountController::class, 'tree']);
+        Route::get('/accounts/roles', [AccountController::class, 'roles']);
         Route::get('/journals', [JournalController::class, 'index']);
         Route::get('/journals/{id}', [JournalController::class, 'show']);
 
@@ -264,6 +266,7 @@ Route::prefix('v1')->group(function () {
             // --- Ledger: commands ---
             Route::post('/accounts', [AccountController::class, 'store']);
             Route::patch('/accounts/{id}', [AccountController::class, 'update']);
+            Route::put('/accounts/roles/{roleKey}', [AccountController::class, 'mapRole']);
             Route::post('/journals', [JournalController::class, 'store']);
             Route::post('/journals/{id}/post', [JournalController::class, 'post']);
             Route::post('/journals/{id}/reverse', [JournalController::class, 'reverse']);

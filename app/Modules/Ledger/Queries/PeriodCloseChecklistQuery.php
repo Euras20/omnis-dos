@@ -6,6 +6,7 @@ namespace App\Modules\Ledger\Queries;
 
 use App\Models\CloseWaiver;
 use App\Models\PeriodClose;
+use App\Modules\Ledger\Services\RoleResolver;
 use App\Shared\Company\CompanyContext;
 use App\Shared\Permissions\PermissionChecker;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,7 @@ final class PeriodCloseChecklistQuery
     public function __construct(
         private readonly CompanyContext $companyContext,
         private readonly PermissionChecker $permissionChecker,
+        private readonly RoleResolver $roleResolver,
     ) {
     }
 
@@ -126,34 +128,34 @@ final class PeriodCloseChecklistQuery
             if ((int) $row->net_minor === 0) {
                 continue;
             }
-            if ($row->category === null || $row->category === '' || $row->fs_line_item === null || $row->fs_line_item === '') {
-                $unmapped[] = (string) $row->code;
+            if ($row->report_section === null || $row->report_section === '') {
+                $unmapped[] = (string) ($row->name ?? $row->code ?? $row->id);
             }
         }
         $unmappedIssue = $unmapped === [] ? null : implode(', ', $unmapped).' unmapped';
 
         $arSub = $this->sumInvoiceOpen($companyId, $end);
-        $arCtl = (int) ($balances['1100']->net_minor ?? 0);
+        $arCtl = $this->roleBalance($companyId, $end, 'CUSTOMER_AR');
         $arIssue = $arSub === $arCtl
             ? null
             : sprintf('subledger %d vs control %d', $arSub, $arCtl);
 
         $apSub = $this->sumBillOpen($companyId, $end);
-        $apCtl = -1 * (int) ($balances['2000']->net_minor ?? 0);
+        $apCtl = -1 * $this->roleBalance($companyId, $end, 'TRADE_PAYABLE');
         $apIssue = $apSub === $apCtl
             ? null
             : sprintf('subledger %d vs control %d', $apSub, $apCtl);
 
         $advSub = $this->sumReceiptAvailable($companyId, $end);
-        $advCtl = -1 * (int) ($balances['2100']->net_minor ?? 0);
+        $advCtl = -1 * $this->roleBalance($companyId, $end, 'CUSTOMER_ADVANCES');
         $advIssue = $advSub === $advCtl
             ? null
-            : sprintf('register %d vs 2100 %d', $advSub, $advCtl);
+            : sprintf('register %d vs advances %d', $advSub, $advCtl);
 
         $stockValue = (int) DB::table('stock_on_hand')
             ->where('company_id', $companyId)
             ->sum('value_minor');
-        $stockGl = (int) ($balances['1300']->net_minor ?? 0) + (int) ($balances['1340']->net_minor ?? 0);
+        $stockGl = $this->roleBalance($companyId, $end, 'INVENTORY');
         $stockIssue = $stockValue === $stockGl
             ? null
             : sprintf('stock %d vs GL %d', $stockValue, $stockGl);
@@ -215,21 +217,39 @@ final class PeriodCloseChecklistQuery
     private function accountBalances(string $companyId, string $asOf): array
     {
         $rows = DB::select(
-            'SELECT a.code, a.category, a.fs_line_item,
+            'SELECT a.id, a.code, a.name, a.category, a.report_section,
                     COALESCE(SUM(jl.debit_minor - jl.credit_minor), 0) AS net_minor
              FROM account a
              LEFT JOIN journal_line jl ON jl.account_id = a.id AND jl.company_id = a.company_id
              LEFT JOIN journal j ON j.id = jl.journal_id AND j.status = \'posted\' AND j.posting_date <= ?
-             WHERE a.company_id = ?
-             GROUP BY a.code, a.category, a.fs_line_item',
+             WHERE a.company_id = ? AND a.node_type = \'POSTING\'
+             GROUP BY a.id, a.code, a.name, a.category, a.report_section',
             [$asOf, $companyId]
         );
-        $byCode = [];
+        $byId = [];
         foreach ($rows as $row) {
-            $byCode[(string) $row->code] = $row;
+            $byId[(string) $row->id] = $row;
         }
 
-        return $byCode;
+        return $byId;
+    }
+
+    private function roleBalance(string $companyId, string $asOf, string $roleKey): int
+    {
+        $accountId = $this->roleResolver->idOrNull($companyId, $roleKey);
+        if ($accountId === null) {
+            return 0;
+        }
+
+        $row = DB::selectOne(
+            'SELECT COALESCE(SUM(jl.debit_minor - jl.credit_minor), 0) AS net_minor
+             FROM journal_line jl
+             JOIN journal j ON j.id = jl.journal_id
+             WHERE jl.company_id = ? AND jl.account_id = ? AND j.status = \'posted\' AND j.posting_date <= ?',
+            [$companyId, $accountId, $asOf]
+        );
+
+        return (int) ($row->net_minor ?? 0);
     }
 
     private function sumInvoiceOpen(string $companyId, string $asOf): int

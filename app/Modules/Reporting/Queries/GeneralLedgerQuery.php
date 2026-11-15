@@ -53,9 +53,15 @@ final class GeneralLedgerQuery
 
         $accountQuery = Account::query()
             ->where('company_id', $companyId)
-            ->orderBy('code');
+            ->where('node_type', 'POSTING')
+            ->orderBy('category')
+            ->orderBy('name');
         if ($accountCode !== null) {
-            $accountQuery->where('code', $accountCode);
+            $accountQuery->where(function ($builder) use ($accountCode) {
+                $builder->where('code', $accountCode)
+                    ->orWhere('id', $accountCode)
+                    ->orWhere('name', 'ilike', $accountCode);
+            });
         }
         $accounts = $accountQuery->get();
         $accountIds = $accounts->pluck('id')->all();
@@ -146,9 +152,11 @@ final class GeneralLedgerQuery
             }
 
             $sections[] = [
+                'accountId' => $account->id,
                 'accountCode' => $account->code,
                 'accountName' => $account->name,
                 'category' => $account->category,
+                'reportSection' => $account->report_section,
                 'fsLineItem' => $account->fs_line_item,
                 'fsSubLine' => $account->fs_sub_line,
                 'normalBalance' => $account->normal_balance,

@@ -5,45 +5,37 @@ declare(strict_types=1);
 namespace App\Modules\Payables\Services;
 
 use App\Exceptions\BusinessRuleException;
-use App\Models\Account;
-use Illuminate\Support\Facades\Cache;
+use App\Modules\Ledger\Services\RoleResolver;
 
 /**
- * Resolves standard account codes used by AP posting to account UUIDs.
+ * Resolves AP posting roles to account UUIDs.
+ * Codes are not used. Unmapped roles fail with a finance-setup error.
  */
 final class AccountResolver
 {
-    private const CODES = [
-        'ap' => '2000',
-        'expense' => '5000',
-        'claimable_tax' => '1400',
-        'wht_payable' => '2320',
-        'cash' => '1000',
-        'grni' => '2050',
+    private const ROLES = [
+        'ap' => 'TRADE_PAYABLE',
+        'expense' => 'COGS',
+        'claimable_tax' => 'CLAIMABLE_TAX',
+        'wht_payable' => 'WHT_PAYABLE',
+        'cash' => 'BANK_CASH',
+        'grni' => 'GRNI',
     ];
+
+    public function __construct(
+        private readonly RoleResolver $roles,
+    ) {
+    }
 
     public function idByCode(string $companyId, string $logical): string
     {
-        $code = self::CODES[$logical] ?? $logical;
-
-        $key = "omnis.account.{$companyId}.{$code}";
-        $id = Cache::store('array')->get($key);
-        if (is_string($id)) {
-            return $id;
+        $role = self::ROLES[$logical] ?? null;
+        if ($role === null) {
+            throw new BusinessRuleException(
+                "Finance setup: '{$logical}' is not a posting role. Map a role or pass an account id."
+            );
         }
 
-        $account = Account::query()
-            ->where('company_id', $companyId)
-            ->where('code', $code)
-            ->where('is_active', true)
-            ->first();
-
-        if ($account === null) {
-            throw new BusinessRuleException("Account code '{$code}' is not configured for this company.");
-        }
-
-        Cache::store('array')->put($key, $account->id, 60);
-
-        return $account->id;
+        return $this->roles->id($companyId, $role);
     }
 }

@@ -31,23 +31,43 @@ class Account extends Model
     protected $fillable = [
         'id',
         'company_id',
+        'parent_id',
+        'system_key',
         'code',
         'name',
         'category',
         'kind',
+        'node_type',
+        'source',
         'currency',
         'is_active',
         'fs_line_item',
         'fs_sub_line',
         'normal_balance',
+        'is_contra',
+        'statement',
+        'report_section',
+        'level',
     ];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
+            'is_contra' => 'boolean',
+            'level' => 'integer',
             'row_version' => 'integer',
         ];
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id');
     }
 
     public function company(): BelongsTo

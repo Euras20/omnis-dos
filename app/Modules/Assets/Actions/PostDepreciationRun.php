@@ -14,6 +14,7 @@ use App\Modules\Ledger\Domain\PostingKey;
 use App\Modules\Ledger\Domain\PostingLine;
 use App\Modules\Ledger\Domain\PostingRequest;
 use App\Modules\Ledger\Services\PostingService;
+use App\Modules\Ledger\Services\RoleResolver;
 use App\Shared\Audit\AuditWriter;
 use App\Shared\Company\CompanyContext;
 use App\Shared\Permissions\PermissionChecker;
@@ -28,6 +29,7 @@ final class PostDepreciationRun
 {
     public function __construct(
         private readonly CompanyContext $companyContext,
+        private readonly RoleResolver $roleResolver,
         private readonly PermissionChecker $permissionChecker,
         private readonly PostingService $postingService,
         private readonly PeriodLockChecker $periodLockChecker,
@@ -143,9 +145,8 @@ final class PostDepreciationRun
                 ];
             }
 
-            // Resolve default accounts if class accounts missing
-            $defaultExpense = Account::query()->where('company_id', $companyId)->where('code', '5600')->first();
-            $defaultAccum = Account::query()->where('company_id', $companyId)->where('code', '1510')->first();
+            $expenseId = $this->roleResolver->id($companyId, 'DEPRECIATION_EXPENSE');
+            $accumId = $this->roleResolver->id($companyId, 'ACCUMULATED_DEPRECIATION');
 
             $postingLines = [];
             $expenseTotal = 0;
@@ -171,15 +172,15 @@ final class PostDepreciationRun
                 }
             }
 
-            if ($postingLines === [] && $defaultExpense && $defaultAccum) {
+            if ($postingLines === []) {
                 $postingLines[] = new PostingLine(
-                    accountId: $defaultExpense->id,
+                    accountId: $expenseId,
                     debitMinor: $totalCharge,
                     creditMinor: 0,
                     memo: 'Depreciation '.$periodMonth,
                 );
                 $postingLines[] = new PostingLine(
-                    accountId: $defaultAccum->id,
+                    accountId: $accumId,
                     debitMinor: 0,
                     creditMinor: $totalCharge,
                     memo: 'Accumulated depreciation '.$periodMonth,

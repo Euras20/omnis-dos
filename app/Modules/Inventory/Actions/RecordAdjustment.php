@@ -9,6 +9,7 @@ use App\Models\Account;
 use App\Modules\Inventory\Domain\MovementRequest;
 use App\Modules\Inventory\Domain\MovementType;
 use App\Modules\Inventory\Services\MovementService;
+use App\Modules\Ledger\Services\RoleResolver;
 use App\Modules\Ledger\Domain\PostingKey;
 use App\Modules\Ledger\Domain\PostingLine;
 use App\Modules\Ledger\Domain\PostingRequest;
@@ -33,6 +34,7 @@ final class RecordAdjustment
 {
     public function __construct(
         private readonly CompanyContext $companyContext,
+        private readonly RoleResolver $roleResolver,
         private readonly PermissionChecker $permissionChecker,
         private readonly MovementService $movementService,
         private readonly PostingService $postingService,
@@ -187,14 +189,20 @@ final class RecordAdjustment
 
     private function accountByCode(string $companyId, string $code): Account
     {
-        $account = Account::query()
-            ->where('company_id', $companyId)
-            ->where('code', $code)
-            ->where('is_active', true)
-            ->first();
-
+        $roles = [
+            '1300' => 'INVENTORY',
+            '5000' => 'COGS',
+            '2050' => 'GRNI',
+            '5900' => 'STOCK_ADJUSTMENT',
+        ];
+        $role = $roles[$code] ?? null;
+        if ($role === null) {
+            throw new BusinessRuleException("No posting role for account code {$code}.");
+        }
+        $id = $this->roleResolver->id($companyId, $role);
+        $account = Account::query()->where('company_id', $companyId)->where('id', $id)->first();
         if ($account === null) {
-            throw new BusinessRuleException("Required account code {$code} is missing or inactive.");
+            throw new BusinessRuleException("Mapped account for {$role} was not found.");
         }
 
         return $account;

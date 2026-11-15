@@ -46,7 +46,10 @@ final class TrialBalanceQuery
 
         $accounts = Account::query()
             ->where('company_id', $companyId)
-            ->orderBy('code')
+            ->where('node_type', 'POSTING')
+            ->orderBy('category')
+            ->orderBy('report_section')
+            ->orderBy('name')
             ->get();
 
         $balances = DB::table('journal_line')
@@ -96,9 +99,11 @@ final class TrialBalanceQuery
             $normalBalanceMinor = $normal === 'credit' ? -$net : $net;
 
             $item = [
+                'accountId' => $account->id,
                 'code' => $account->code,
                 'name' => $account->name,
                 'category' => $account->category,
+                'reportSection' => $account->report_section,
                 'fsLineItem' => $account->fs_line_item,
                 'fsSubLine' => $account->fs_sub_line,
                 'normalBalance' => $account->normal_balance,

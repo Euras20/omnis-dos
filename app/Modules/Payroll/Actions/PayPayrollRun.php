@@ -12,6 +12,7 @@ use App\Modules\Ledger\Domain\PostingKey;
 use App\Modules\Ledger\Domain\PostingLine;
 use App\Modules\Ledger\Domain\PostingRequest;
 use App\Modules\Ledger\Services\PostingService;
+use App\Modules\Ledger\Services\RoleResolver;
 use App\Shared\Audit\AuditWriter;
 use App\Shared\Company\CompanyContext;
 use App\Shared\Permissions\PermissionChecker;
@@ -25,6 +26,7 @@ final class PayPayrollRun
 {
     public function __construct(
         private readonly CompanyContext $companyContext,
+        private readonly RoleResolver $roleResolver,
         private readonly PermissionChecker $permissionChecker,
         private readonly PostingService $postingService,
         private readonly PeriodLockChecker $periodLockChecker,
@@ -68,31 +70,19 @@ final class PayPayrollRun
 
             $this->periodLockChecker->assertOpen($payDate);
 
-            $bank = Account::query()
-                ->where('company_id', $companyId)
-                ->where('code', '1100')
-                ->where('is_active', true)
-                ->first();
-            $netPay = Account::query()
-                ->where('company_id', $companyId)
-                ->where('code', '2220')
-                ->where('is_active', true)
-                ->first();
-
-            if ($bank === null || $netPay === null) {
-                throw new BusinessRuleException('Bank (1100) or net-pay (2220) account not found.');
-            }
+            $bankId = $this->roleResolver->id($companyId, 'BANK_CASH');
+            $netPayId = $this->roleResolver->id($companyId, 'NET_PAY');
 
             $net = (int) $run->net_total_minor;
             $lines = [
                 new PostingLine(
-                    accountId: $netPay->id,
+                    accountId: $netPayId,
                     debitMinor: $net,
                     creditMinor: 0,
                     memo: 'Clear net pay '.$run->period_month,
                 ),
                 new PostingLine(
-                    accountId: $bank->id,
+                    accountId: $bankId,
                     debitMinor: 0,
                     creditMinor: $net,
                     memo: 'Payroll payment '.$bankRef,
