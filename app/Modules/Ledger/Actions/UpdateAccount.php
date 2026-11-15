@@ -108,8 +108,25 @@ final class UpdateAccount
      */
     private function applySystemGroupUpdate(Account $account, array $data): void
     {
+        if (isset($data['name'])) {
+            $account->name = trim((string) $data['name']);
+        }
         if (array_key_exists('code', $data)) {
             $account->code = $this->normaliseCode($data['code'], $account);
+        }
+        if (isset($data['isActive'])) {
+            $account->is_active = (bool) $data['isActive'];
+        }
+        if (array_key_exists('reportSection', $data) || array_key_exists('report_section', $data)) {
+            $account->report_section = $data['reportSection'] ?? $data['report_section'] ?? null;
+            $account->fs_line_item = $account->report_section;
+        }
+        if (isset($data['normalBalance'])) {
+            $nb = strtolower(trim((string) $data['normalBalance']));
+            if (! in_array($nb, self::NORMAL_BALANCES, true)) {
+                throw new BusinessRuleException('normalBalance must be debit or credit.');
+            }
+            $account->normal_balance = $nb;
         }
     }
 

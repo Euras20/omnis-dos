@@ -2126,6 +2126,19 @@
             "$ref": "#/components/responses/ValidationError"
           }
         }
+      },
+      "delete": {
+        "tags": ["Ledger"],
+        "summary": "Delete an unused folder or posting account",
+        "operationId": "deleteAccount",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Deleted. Blocked if it has children, journal lines or a role mapping." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
       }
     },
     "/accounts/tree": {

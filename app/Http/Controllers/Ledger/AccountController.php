@@ -8,6 +8,7 @@ use App\Http\Requests\Ledger\MapAccountRoleRequest;
 use App\Http\Requests\Ledger\StoreAccountRequest;
 use App\Http\Requests\Ledger\UpdateAccountRequest;
 use App\Modules\Ledger\Actions\CreateAccount;
+use App\Modules\Ledger\Actions\DeleteAccount;
 use App\Modules\Ledger\Actions\MapAccountRole;
 use App\Modules\Ledger\Actions\UpdateAccount;
 use App\Modules\Ledger\Queries\AccountTreeQuery;
@@ -24,6 +25,7 @@ final class AccountController
         private readonly ListAccountRolesQuery $listAccountRolesQuery,
         private readonly CreateAccount $createAccount,
         private readonly UpdateAccount $updateAccount,
+        private readonly DeleteAccount $deleteAccount,
         private readonly MapAccountRole $mapAccountRole,
     ) {
     }
@@ -69,5 +71,10 @@ final class AccountController
         $account = $this->updateAccount->execute($id, $request->validated());
 
         return response()->json($account);
+    }
+
+    public function destroy(string $id): JsonResponse
+    {
+        return response()->json($this->deleteAccount->execute($id));
     }
 }

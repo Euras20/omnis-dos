@@ -76,9 +76,9 @@ final class MapAccountRole
 
             $this->auditWriter->write(
                 action: 'account_role.mapped',
-                entityType: 'account_role_mapping',
-                entityId: $roleKey,
-                detail: ['accountId' => $account->id, 'accountName' => $account->name],
+                entityType: 'account',
+                entityId: $account->id,
+                detail: ['roleKey' => $roleKey, 'accountName' => $account->name],
                 actorId: $actorId,
             );
 

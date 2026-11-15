@@ -28,6 +28,7 @@ final class UpdateAccountRequest extends FormRequest
             'fsLineItem' => ['sometimes', 'nullable', 'string', 'max:64'],
             'fsSubLine' => ['sometimes', 'nullable', 'string', 'max:64'],
             'normalBalance' => ['sometimes', 'string', 'in:debit,credit'],
+            'reportSection' => ['sometimes', 'nullable', 'string', 'max:128'],
             'rowVersion' => ['sometimes', 'integer', 'min:1'],
         ];
     }

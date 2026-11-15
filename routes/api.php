@@ -266,6 +266,7 @@ Route::prefix('v1')->group(function () {
             // --- Ledger: commands ---
             Route::post('/accounts', [AccountController::class, 'store']);
             Route::patch('/accounts/{id}', [AccountController::class, 'update']);
+            Route::delete('/accounts/{id}', [AccountController::class, 'destroy']);
             Route::put('/accounts/roles/{roleKey}', [AccountController::class, 'mapRole']);
             Route::post('/journals', [JournalController::class, 'store']);
             Route::post('/journals/{id}/post', [JournalController::class, 'post']);
