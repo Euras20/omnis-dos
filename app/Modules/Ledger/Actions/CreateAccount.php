@@ -7,6 +7,7 @@ namespace App\Modules\Ledger\Actions;
 use App\Exceptions\BusinessRuleException;
 use App\Exceptions\ConflictException;
 use App\Models\Account;
+use App\Models\Journal;
 use App\Shared\Audit\AuditWriter;
 use App\Shared\Company\CompanyContext;
 use App\Shared\Permissions\PermissionChecker;
@@ -61,8 +62,9 @@ final class CreateAccount
         $companyId = $this->companyContext->companyId();
         $parentId = isset($data['parentId']) && $data['parentId'] !== '' ? (string) $data['parentId'] : null;
         $code = $this->normaliseCode($data['code'] ?? null);
+        $name = trim((string) $data['name']);
 
-        return DB::transaction(function () use ($data, $code, $category, $kind, $normalBalance, $companyId, $actorId, $parentId) {
+        return DB::transaction(function () use ($data, $code, $category, $kind, $normalBalance, $companyId, $actorId, $parentId, $name) {
             $parent = null;
             if ($parentId !== null) {
                 $parent = Account::query()
@@ -91,7 +93,11 @@ final class CreateAccount
                 if ($exists) {
                     throw new ConflictException("An account with code '{$code}' already exists.");
                 }
+            } else {
+                $code = $this->nextCodeForCategory($category, $companyId);
             }
+
+            $this->assertNameUnique($name, $companyId, null);
 
             $nodeType = strtoupper((string) ($data['nodeType'] ?? 'POSTING'));
             if (! in_array($nodeType, ['GROUP', 'POSTING'], true)) {
@@ -104,13 +110,21 @@ final class CreateAccount
             $account->parent_id = $parent?->id;
             $account->system_key = null;
             $account->code = $code;
-            $account->name = trim((string) $data['name']);
+            $account->name = $name;
+            $account->description = isset($data['description']) ? trim((string) $data['description']) : null;
             $account->category = $category;
+            $account->detail_type = isset($data['detailType']) ? trim((string) $data['detailType']) : null;
             $account->kind = $nodeType === 'GROUP' ? 'header' : $kind;
             $account->node_type = $nodeType;
             $account->source = 'CLIENT';
             $account->currency = isset($data['currency']) ? strtoupper((string) $data['currency']) : null;
             $account->is_active = true;
+            $account->is_locked = (bool) ($data['lockOnCreate'] ?? false);
+            if ($account->is_locked) {
+                $account->locked_by = $actorId;
+                $account->locked_at = now();
+                $account->lock_reason = 'Locked when created';
+            }
             $account->fs_line_item = $data['fsLineItem'] ?? $data['fs_line_item'] ?? $parent?->report_section;
             $account->fs_sub_line = $data['fsSubLine'] ?? $data['fs_sub_line'] ?? null;
             $account->normal_balance = $normalBalance;
@@ -127,13 +141,22 @@ final class CreateAccount
                 detail: [
                     'code' => $account->code,
                     'name' => $account->name,
+                    'detailType' => $account->detail_type,
                     'parentId' => $account->parent_id,
                     'nodeType' => $account->node_type,
+                    'isLocked' => $account->is_locked,
                 ],
                 actorId: $actorId,
             );
 
-            return $this->toArray($account);
+            $openingJournalId = $this->maybeCreateOpeningBalance($account, $data, $companyId, $actorId);
+
+            $result = $this->toArray($account);
+            if ($openingJournalId !== null) {
+                $result['openingBalanceJournalId'] = $openingJournalId;
+            }
+
+            return $result;
         });
     }
 
@@ -172,6 +195,139 @@ final class CreateAccount
         throw new BusinessRuleException('Parent must sit under a level-3 system group.');
     }
 
+    private function assertNameUnique(string $name, string $companyId, ?string $excludeId): void
+    {
+        $query = Account::query()
+            ->where('company_id', $companyId)
+            ->whereRaw('lower(name) = ?', [strtolower($name)]);
+
+        if ($excludeId !== null) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        if ($query->exists()) {
+            throw new ConflictException("An account named '{$name}' already exists. Use the existing account or choose a clearer name.");
+        }
+    }
+
+    private function nextCodeForCategory(string $category, string $companyId): string
+    {
+        $ranges = [
+            'asset' => [1000, 1999],
+            'liability' => [2000, 2999],
+            'equity' => [3000, 3999],
+            'income' => [4000, 4999],
+            'expense' => [5000, 7999],
+        ];
+
+        $range = $ranges[$category] ?? [9000, 9999];
+        $used = Account::query()
+            ->where('company_id', $companyId)
+            ->whereNotNull('code')
+            ->whereRaw('code ~ ?', ['^[0-9]+$'])
+            ->pluck('code')
+            ->map(fn ($c) => (int) $c)
+            ->filter(fn ($n) => $n >= $range[0] && $n <= $range[1])
+            ->all();
+
+        $usedSet = array_flip($used);
+        $candidate = empty($used) ? $range[0] : (int) (floor(max($used) / 10) * 10 + 10);
+
+        while ($candidate <= $range[1] && isset($usedSet[$candidate])) {
+            $candidate += 10;
+        }
+
+        if ($candidate <= $range[1]) {
+            return (string) $candidate;
+        }
+
+        for ($n = $range[0]; $n <= $range[1]; $n++) {
+            if (! isset($usedSet[$n])) {
+                return (string) $n;
+            }
+        }
+
+        throw new BusinessRuleException("No free account number left in the {$category} range.");
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function maybeCreateOpeningBalance(Account $account, array $data, string $companyId, string $actorId): ?string
+    {
+        $amount = isset($data['openingBalanceMinor']) ? (int) $data['openingBalanceMinor'] : 0;
+        if ($amount <= 0) {
+            return null;
+        }
+
+        if (! in_array($account->category, ['asset', 'liability', 'equity'], true)) {
+            throw new BusinessRuleException('Only balance-sheet accounts take an opening balance.');
+        }
+
+        $date = $data['openingBalanceDate'] ?? null;
+        if ($date === null || $date === '') {
+            throw new BusinessRuleException('openingBalanceDate is required with an opening balance.');
+        }
+
+        $clearing = Account::query()
+            ->where('company_id', $companyId)
+            ->where('code', '3900')
+            ->first();
+
+        if ($clearing === null) {
+            throw new BusinessRuleException('Opening balance clearing account (3900) is missing.');
+        }
+
+        $isDebit = $account->normal_balance === 'debit';
+        $journal = new Journal;
+        $journal->id = Uuid::v7();
+        $journal->company_id = $companyId;
+        $journal->posting_date = $date;
+        $journal->description = "Opening balance · {$account->code} {$account->name}";
+        $journal->source_type = 'opening';
+        $journal->source_id = $account->id;
+        $journal->event_type = 'opening_balance';
+        $journal->posting_key = 'opening:'.$account->id.':draft';
+        $journal->status = 'draft';
+        $journal->prepared_by = $actorId;
+        $journal->currency = $account->currency ?? 'GHS';
+        $journal->save();
+
+        $lineNo = 1;
+        if ($isDebit) {
+            $this->addJournalLine($journal, $lineNo++, $account->id, $amount, 0, $companyId);
+            $this->addJournalLine($journal, $lineNo, $clearing->id, 0, $amount, $companyId);
+        } else {
+            $this->addJournalLine($journal, $lineNo++, $clearing->id, $amount, 0, $companyId);
+            $this->addJournalLine($journal, $lineNo, $account->id, 0, $amount, $companyId);
+        }
+
+        $this->auditWriter->write(
+            action: 'account.opening_balance_drafted',
+            entityType: 'account',
+            entityId: $account->id,
+            detail: [
+                'journalId' => $journal->id,
+                'amountMinor' => $amount,
+                'date' => $date,
+            ],
+            actorId: $actorId,
+        );
+
+        return $journal->id;
+    }
+
+    private function addJournalLine(Journal $journal, int $lineNo, string $accountId, int $debit, int $credit, string $companyId): void
+    {
+        $journal->lines()->create([
+            'company_id' => $companyId,
+            'line_no' => $lineNo,
+            'account_id' => $accountId,
+            'debit_minor' => $debit,
+            'credit_minor' => $credit,
+        ]);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -181,7 +337,9 @@ final class CreateAccount
             'id' => $account->id,
             'code' => $account->code,
             'name' => $account->name,
+            'description' => $account->description,
             'category' => $account->category,
+            'detailType' => $account->detail_type,
             'kind' => $account->kind,
             'nodeType' => $account->node_type,
             'source' => $account->source,
@@ -190,6 +348,10 @@ final class CreateAccount
             'isPostable' => $account->node_type === 'POSTING',
             'currency' => $account->currency,
             'isActive' => $account->is_active,
+            'isLocked' => $account->is_locked,
+            'lockedBy' => $account->locked_by,
+            'lockedAt' => $account->locked_at?->toIso8601String(),
+            'lockReason' => $account->lock_reason,
             'fsLineItem' => $account->fs_line_item,
             'fsSubLine' => $account->fs_sub_line,
             'normalBalance' => $account->normal_balance,

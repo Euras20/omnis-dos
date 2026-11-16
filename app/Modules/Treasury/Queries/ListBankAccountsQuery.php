@@ -25,11 +25,16 @@ final class ListBankAccountsQuery
         $companyId = $this->companyContext->companyId();
 
         $items = CompanyBankAccount::query()
+            ->with('glAccount')
             ->where('company_id', $companyId)
             ->orderBy('bank_name')
             ->get()
             ->map(static fn (CompanyBankAccount $a) => [
                 'id' => $a->id,
+                'type' => $a->type,
+                'glAccountId' => $a->gl_account_id,
+                'glAccountCode' => $a->glAccount?->code,
+                'glAccountName' => $a->glAccount?->name,
                 'bankName' => $a->bank_name,
                 'accountName' => $a->account_name,
                 'accountNumber' => $a->account_number,

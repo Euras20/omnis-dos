@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CompanyBankAccount extends Model
 {
@@ -20,6 +21,11 @@ class CompanyBankAccount extends Model
     protected $fillable = [
         'id',
         'company_id',
+        'type',
+        'gl_account_id',
+        'opening_balance_doc_id',
+        'opening_balance_date',
+        'opening_balance_minor',
         'bank_name',
         'account_name',
         'account_number',
@@ -34,5 +40,10 @@ class CompanyBankAccount extends Model
         return [
             'is_active' => 'boolean',
         ];
+    }
+
+    public function glAccount(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'gl_account_id');
     }
 }

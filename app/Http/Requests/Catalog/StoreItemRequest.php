@@ -37,6 +37,9 @@ final class StoreItemRequest extends FormRequest
             'reorderPoint' => ['nullable', 'numeric', 'min:0'],
             'safetyStock' => ['nullable', 'numeric', 'min:0'],
             'inventoryAccountCode' => ['nullable', 'string', 'max:32'],
+            'invAccountId' => ['nullable', 'uuid'],
+            'incomeAccountId' => ['nullable', 'uuid'],
+            'cogsAccountId' => ['nullable', 'uuid'],
         ];
     }
 }

@@ -21,7 +21,9 @@ final class StoreAccountRequest extends FormRequest
         return [
             'code' => ['sometimes', 'nullable', 'string', 'max:32'],
             'name' => ['required', 'string', 'max:255'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:512'],
             'category' => ['sometimes', 'string', 'in:asset,liability,equity,income,expense'],
+            'detailType' => ['sometimes', 'nullable', 'string', 'max:80'],
             'kind' => ['sometimes', 'string', 'in:header,detail'],
             'nodeType' => ['sometimes', 'string', 'in:GROUP,POSTING,group,posting'],
             'parentId' => ['sometimes', 'nullable', 'uuid'],
@@ -30,6 +32,9 @@ final class StoreAccountRequest extends FormRequest
             'fsLineItem' => ['sometimes', 'nullable', 'string', 'max:64'],
             'fsSubLine' => ['sometimes', 'nullable', 'string', 'max:64'],
             'normalBalance' => ['sometimes', 'string', 'in:debit,credit'],
+            'openingBalanceMinor' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'openingBalanceDate' => ['sometimes', 'nullable', 'date'],
+            'lockOnCreate' => ['sometimes', 'boolean'],
         ];
     }
 }

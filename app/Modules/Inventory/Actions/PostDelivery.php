@@ -99,9 +99,10 @@ final class PostDelivery
             $qty = (float) $assignment->qty;
             $costTotal = (int) round($qty * $unitCost);
 
-            // Resolve inventory and COGS accounts by code convention (1300 inventory, 5000 COGS).
-            $inventoryAccount = $this->accountByCode($companyId, '1300');
-            $cogsAccount = $this->accountByCode($companyId, '5000');
+            // Prefer item overrides; fall back to roles.
+            $item = \App\Models\Item::query()->find($assignment->item_id);
+            $inventoryAccountId = $item?->inv_account_id ?? $this->accountByCode($companyId, '1300')->id;
+            $cogsAccountId = $item?->cogs_account_id ?? $this->accountByCode($companyId, '5000')->id;
 
             $deliveryId = Uuid::v7();
             $postingKey = PostingKey::make('delivery', $deliveryId, 'deliver');
@@ -116,14 +117,14 @@ final class PostDelivery
                 description: $memo ?? "Delivery {$deliveryId}",
                 lines: [
                     new PostingLine(
-                        accountId: $cogsAccount->id,
+                        accountId: $cogsAccountId,
                         debitMinor: $costTotal,
                         creditMinor: 0,
                         partyId: null,
                         memo: 'Cost of sales',
                     ),
                     new PostingLine(
-                        accountId: $inventoryAccount->id,
+                        accountId: $inventoryAccountId,
                         debitMinor: 0,
                         creditMinor: $costTotal,
                         partyId: null,

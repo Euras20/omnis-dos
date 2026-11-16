@@ -83,7 +83,9 @@ final class UpdateAccount
                 'id' => $account->id,
                 'code' => $account->code,
                 'name' => $account->name,
+                'description' => $account->description,
                 'category' => $account->category,
+                'detailType' => $account->detail_type,
                 'kind' => $account->kind,
                 'nodeType' => $account->node_type,
                 'source' => $account->source,
@@ -92,6 +94,10 @@ final class UpdateAccount
                 'isPostable' => $account->node_type === 'POSTING',
                 'currency' => $account->currency,
                 'isActive' => $account->is_active,
+                'isLocked' => $account->is_locked,
+                'lockedBy' => $account->locked_by,
+                'lockedAt' => $account->locked_at?->toIso8601String(),
+                'lockReason' => $account->lock_reason,
                 'fsLineItem' => $account->fs_line_item,
                 'fsSubLine' => $account->fs_sub_line,
                 'normalBalance' => $account->normal_balance,
@@ -136,7 +142,17 @@ final class UpdateAccount
     private function applyClientUpdate(Account $account, array $data): void
     {
         if (isset($data['name'])) {
-            $account->name = trim((string) $data['name']);
+            $newName = trim((string) $data['name']);
+            if ($newName !== $account->name) {
+                $this->assertNameUnique($newName, $account->company_id, $account->id);
+            }
+            $account->name = $newName;
+        }
+        if (array_key_exists('description', $data)) {
+            $account->description = $data['description'] !== null ? trim((string) $data['description']) : null;
+        }
+        if (array_key_exists('detailType', $data)) {
+            $account->detail_type = $data['detailType'] !== null ? trim((string) $data['detailType']) : null;
         }
         if (array_key_exists('code', $data)) {
             $account->code = $this->normaliseCode($data['code'], $account);
@@ -175,6 +191,21 @@ final class UpdateAccount
                 throw new BusinessRuleException('normalBalance must be debit or credit.');
             }
             $account->normal_balance = $nb;
+        }
+    }
+
+    private function assertNameUnique(string $name, string $companyId, ?string $excludeId): void
+    {
+        $query = Account::query()
+            ->where('company_id', $companyId)
+            ->whereRaw('lower(name) = ?', [strtolower($name)]);
+
+        if ($excludeId !== null) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        if ($query->exists()) {
+            throw new BusinessRuleException("An account named '{$name}' already exists. Use the existing account or choose a clearer name.");
         }
     }
 

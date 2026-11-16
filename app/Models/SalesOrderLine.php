@@ -29,6 +29,7 @@ class SalesOrderLine extends Model
         'qty',
         'unit',
         'unit_price_minor',
+        'discount_percent',
         'net_minor',
         'tax_minor',
         'gross_minor',
@@ -41,6 +42,7 @@ class SalesOrderLine extends Model
         return [
             'qty' => 'decimal:3',
             'unit_price_minor' => 'integer',
+            'discount_percent' => 'decimal:2',
             'net_minor' => 'integer',
             'tax_minor' => 'integer',
             'gross_minor' => 'integer',

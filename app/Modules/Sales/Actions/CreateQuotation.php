@@ -142,7 +142,12 @@ final class CreateQuotation
                     throw new BusinessRuleException("Line {$index}: description is required when itemId is omitted.");
                 }
 
-                $net = (int) round((float) $qty * $unitPrice);
+                $lineDiscount = (float) ($raw['discountPercent'] ?? $raw['discount_percent'] ?? 0);
+                if ($lineDiscount < 0 || $lineDiscount > 100) {
+                    throw new BusinessRuleException("Line {$index}: discountPercent must be between 0 and 100.");
+                }
+
+                $net = (int) round((float) $qty * $unitPrice * (1 - $lineDiscount / 100));
                 $tax = (int) round($net * $combinedTaxRate);
                 $gross = $net + $tax;
                 $headerNet += $net;
@@ -159,6 +164,7 @@ final class CreateQuotation
                     'qty' => $qty,
                     'unit' => $unit,
                     'unit_price_minor' => $unitPrice,
+                    'discount_percent' => $lineDiscount,
                     'net_minor' => $net,
                     'tax_minor' => $tax,
                     'gross_minor' => $gross,
@@ -179,6 +185,7 @@ final class CreateQuotation
                 'valid_until' => $validUntil,
                 'currency' => $currency,
                 'discount_percent' => $discountPercent,
+                'discount_status' => $discountPercent > 0 ? 'pending' : 'none',
                 'status' => QuotationStatus::DRAFT,
                 'net_minor' => $discountedNet,
                 'tax_total_minor' => $discountedTax,

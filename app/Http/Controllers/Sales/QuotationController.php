@@ -12,6 +12,7 @@ use App\Modules\Reporting\Queries\DocumentPrintQuery;
 use App\Modules\Sales\Actions\ChangeQuotationStatus;
 use App\Modules\Sales\Actions\ConvertQuotation;
 use App\Modules\Sales\Actions\CreateQuotation;
+use App\Modules\Sales\Actions\DecideDiscount;
 use App\Modules\Sales\Actions\SendQuotation;
 use App\Modules\Sales\Actions\UpdateQuotation;
 use App\Modules\Sales\Queries\GetQuotationQuery;
@@ -29,6 +30,7 @@ final class QuotationController
         private readonly ChangeQuotationStatus $changeQuotationStatus,
         private readonly ConvertQuotation $convertQuotation,
         private readonly SendQuotation $sendQuotation,
+        private readonly DecideDiscount $decideDiscount,
         private readonly DocumentPrintQuery $printQuery,
     ) {
     }
@@ -91,5 +93,19 @@ final class QuotationController
     public function print(string $id): JsonResponse
     {
         return response()->json($this->printQuery->quotation($id));
+    }
+
+    public function approveDiscount(string $id, Request $request): JsonResponse
+    {
+        $data = $request->validate(['reason' => ['nullable', 'string', 'max:512']]);
+
+        return response()->json($this->decideDiscount->execute('quotation', $id, 'approve', $data));
+    }
+
+    public function rejectDiscount(string $id, Request $request): JsonResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:512']]);
+
+        return response()->json($this->decideDiscount->execute('quotation', $id, 'reject', $data));
     }
 }

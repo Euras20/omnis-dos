@@ -120,7 +120,9 @@ final class PostBill
 
             $resolvedExpenseId = $expenseAccountId;
             if ($resolvedExpenseId === null || $resolvedExpenseId === '') {
-                $resolvedExpenseId = $this->accountResolver->idByCode($companyId, $expenseAccountCode);
+                $party = \App\Models\Party::query()->find($supplierId);
+                $resolvedExpenseId = $party?->purchase_account_id
+                    ?? $this->accountResolver->idByCode($companyId, $expenseAccountCode);
             }
 
             $bill = new Bill;
@@ -168,7 +170,8 @@ final class PostBill
                 );
             }
             $lines[] = new PostingLine(
-                accountId: $this->accountResolver->idByCode($companyId, 'ap'),
+                accountId: (\App\Models\Party::query()->find($supplierId)?->ap_account_id)
+                    ?? $this->accountResolver->idByCode($companyId, 'ap'),
                 debitMinor: 0,
                 creditMinor: $grossMinor,
                 partyId: $supplierId,

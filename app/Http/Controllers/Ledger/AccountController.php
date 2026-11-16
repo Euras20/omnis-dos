@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Ledger;
 
+use App\Http\Requests\Ledger\BulkUpdateAccountsRequest;
+use App\Http\Requests\Ledger\LockAccountRequest;
 use App\Http\Requests\Ledger\MapAccountRoleRequest;
 use App\Http\Requests\Ledger\StoreAccountRequest;
 use App\Http\Requests\Ledger\UpdateAccountRequest;
+use App\Modules\Ledger\Actions\BulkUpdateAccounts;
 use App\Modules\Ledger\Actions\CreateAccount;
 use App\Modules\Ledger\Actions\DeleteAccount;
+use App\Modules\Ledger\Actions\LockAccount;
 use App\Modules\Ledger\Actions\MapAccountRole;
+use App\Modules\Ledger\Actions\UnlockAccount;
 use App\Modules\Ledger\Actions\UpdateAccount;
 use App\Modules\Ledger\Queries\AccountTreeQuery;
 use App\Modules\Ledger\Queries\ListAccountRolesQuery;
@@ -27,6 +32,9 @@ final class AccountController
         private readonly UpdateAccount $updateAccount,
         private readonly DeleteAccount $deleteAccount,
         private readonly MapAccountRole $mapAccountRole,
+        private readonly LockAccount $lockAccount,
+        private readonly UnlockAccount $unlockAccount,
+        private readonly BulkUpdateAccounts $bulkUpdateAccounts,
     ) {
     }
 
@@ -76,5 +84,20 @@ final class AccountController
     public function destroy(string $id): JsonResponse
     {
         return response()->json($this->deleteAccount->execute($id));
+    }
+
+    public function lock(string $id, LockAccountRequest $request): JsonResponse
+    {
+        return response()->json($this->lockAccount->execute($id, $request->validated()));
+    }
+
+    public function unlock(string $id, LockAccountRequest $request): JsonResponse
+    {
+        return response()->json($this->unlockAccount->execute($id, $request->validated()));
+    }
+
+    public function bulk(BulkUpdateAccountsRequest $request): JsonResponse
+    {
+        return response()->json($this->bulkUpdateAccounts->execute($request->validated()));
     }
 }

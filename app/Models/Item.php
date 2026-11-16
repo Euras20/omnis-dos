@@ -40,6 +40,13 @@ class Item extends Model
         'reorder_point',
         'safety_stock',
         'inventory_account_code',
+        'inv_account_id',
+        'income_account_id',
+        'cogs_account_id',
+        'opening_balance_doc_id',
+        'opening_balance_date',
+        'opening_balance_qty',
+        'opening_balance_minor',
         'is_active',
     ];
 

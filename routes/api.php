@@ -265,8 +265,11 @@ Route::prefix('v1')->group(function () {
 
             // --- Ledger: commands ---
             Route::post('/accounts', [AccountController::class, 'store']);
+            Route::post('/accounts/bulk', [AccountController::class, 'bulk']);
             Route::patch('/accounts/{id}', [AccountController::class, 'update']);
             Route::delete('/accounts/{id}', [AccountController::class, 'destroy']);
+            Route::post('/accounts/{id}/lock', [AccountController::class, 'lock']);
+            Route::post('/accounts/{id}/unlock', [AccountController::class, 'unlock']);
             Route::put('/accounts/roles/{roleKey}', [AccountController::class, 'mapRole']);
             Route::post('/journals', [JournalController::class, 'store']);
             Route::post('/journals/{id}/post', [JournalController::class, 'post']);
@@ -275,6 +278,7 @@ Route::prefix('v1')->group(function () {
             // --- Catalog: commands ---
             Route::post('/parties', [PartyController::class, 'store']);
             Route::patch('/parties/{id}', [PartyController::class, 'update']);
+            Route::post('/parties/{id}/opening-balance', [PartyController::class, 'openingBalance']);
 
             Route::post('/locations', [LocationController::class, 'store']);
             Route::delete('/locations/{id}', [LocationController::class, 'destroy']);
@@ -283,6 +287,7 @@ Route::prefix('v1')->group(function () {
             Route::patch('/item-categories/{id}', [ItemCategoryController::class, 'update']);
             Route::post('/items', [ItemController::class, 'store']);
             Route::patch('/items/{id}', [ItemController::class, 'update']);
+            Route::post('/items/{id}/opening-balance', [ItemController::class, 'openingBalance']);
             Route::post('/order-types', [OrderTypeController::class, 'store']);
             Route::patch('/order-types/{id}', [OrderTypeController::class, 'update']);
 
@@ -350,6 +355,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/quotations/{id}/status', [QuotationController::class, 'status']);
             Route::post('/quotations/{id}/send', [QuotationController::class, 'send']);
             Route::post('/quotations/{id}/convert', [QuotationController::class, 'convert']);
+            Route::post('/quotations/{id}/discount/approve', [QuotationController::class, 'approveDiscount']);
+            Route::post('/quotations/{id}/discount/reject', [QuotationController::class, 'rejectDiscount']);
             Route::post('/sales-orders', [SalesOrderController::class, 'store']);
             Route::post('/sales-orders/{id}/confirm', [SalesOrderController::class, 'confirm']);
 
@@ -400,6 +407,8 @@ Route::prefix('v1')->group(function () {
             // --- Treasury: commands ---
             Route::post('/imports/{type}', [ImportController::class, 'store']);
             Route::post('/bank-accounts', [BankAccountController::class, 'store']);
+            Route::patch('/bank-accounts/{id}', [BankAccountController::class, 'update']);
+            Route::post('/bank-accounts/{id}/opening-balance', [BankAccountController::class, 'openingBalance']);
             Route::post("/bank/imports", [BankImportController::class, "store"]);
             Route::post('/bank/lines/{id}/match', [BankLineController::class, 'match']);
             Route::post('/bank/lines/{id}/exclude', [BankLineController::class, 'exclude']);

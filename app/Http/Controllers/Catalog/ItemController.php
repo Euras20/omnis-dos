@@ -9,6 +9,7 @@ use App\Http\Requests\Catalog\UpdateItemRequest;
 use App\Modules\Catalog\Actions\CreateItem;
 use App\Modules\Catalog\Actions\UpdateItem;
 use App\Modules\Catalog\Queries\ListItemsQuery;
+use App\Modules\Inventory\Actions\PostItemOpeningBalance;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,6 +19,7 @@ final class ItemController
         private readonly ListItemsQuery $listItemsQuery,
         private readonly CreateItem $createItem,
         private readonly UpdateItem $updateItem,
+        private readonly PostItemOpeningBalance $postOpening,
     ) {
     }
 
@@ -51,5 +53,17 @@ final class ItemController
         $item = $this->updateItem->execute($id, $request->validated());
 
         return response()->json($item);
+    }
+
+    public function openingBalance(string $id, Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'qty' => ['required', 'numeric', 'min:0.001'],
+            'unitCostMinor' => ['required', 'integer', 'min:1'],
+            'locationId' => ['required', 'uuid'],
+            'asOfDate' => ['required', 'date'],
+        ]);
+
+        return response()->json($this->postOpening->execute($id, $data), 201);
     }
 }

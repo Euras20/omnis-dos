@@ -79,6 +79,10 @@ final class CreateParty
             $party->vat_registered = (bool) ($data['vatRegistered'] ?? $data['vatReg'] ?? false);
             $party->wht_rule_code = $data['whtRuleCode'] ?? $data['wht'] ?? null;
             $party->account_owner = $data['accountOwner'] ?? $data['owner'] ?? null;
+            $party->ar_account_id = $data['arAccountId'] ?? null;
+            $party->income_account_id = $data['incomeAccountId'] ?? null;
+            $party->ap_account_id = $data['apAccountId'] ?? null;
+            $party->purchase_account_id = $data['purchaseAccountId'] ?? null;
             $party->is_main_supplier = (bool) ($data['isMainSupplier'] ?? $data['main'] ?? false);
             $party->contacts = $data['contacts'] ?? null;
             $party->bank_details = $data['bankDetails'] ?? null;
@@ -138,6 +142,10 @@ final class CreateParty
             'vatRegistered' => (bool) $party->vat_registered,
             'whtRuleCode' => $party->wht_rule_code,
             'accountOwner' => $party->account_owner,
+            'arAccountId' => $party->ar_account_id,
+            'incomeAccountId' => $party->income_account_id,
+            'apAccountId' => $party->ap_account_id,
+            'purchaseAccountId' => $party->purchase_account_id,
             'isMainSupplier' => (bool) $party->is_main_supplier,
             'contacts' => $party->contacts,
             'bankDetails' => $party->bank_details,

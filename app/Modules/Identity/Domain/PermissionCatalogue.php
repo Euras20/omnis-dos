@@ -34,6 +34,7 @@ final class PermissionCatalogue
             self::entry('sales.orders.view', 'Sales', 'Sales orders', 'View', 'View sales orders', false),
             self::entry('sales.orders.manage', 'Sales', 'Sales orders', 'Manage', 'Create and confirm sales orders', false),
             self::entry('sales.manage', 'Sales', 'Sales', 'Manage', 'Broad sales management', false),
+            self::entry('sales.discount.approve', 'Sales', 'Discount', 'Approve', 'Approve or reject a discount on a quotation or sales order', false),
             self::entry('customers.view', 'Sales', 'Customers', 'View', 'View customers', false),
             self::entry('customers.manage', 'Sales', 'Customers', 'Manage', 'Create and edit customers', false),
 

@@ -101,6 +101,9 @@ final class CreateItem
             $item->reorder_point = $data['reorderPoint'] ?? $data['reorder'] ?? null;
             $item->safety_stock = $data['safetyStock'] ?? $data['safety'] ?? null;
             $item->inventory_account_code = $data['inventoryAccountCode'] ?? null;
+            $item->inv_account_id = $data['invAccountId'] ?? null;
+            $item->income_account_id = $data['incomeAccountId'] ?? null;
+            $item->cogs_account_id = $data['cogsAccountId'] ?? null;
             $item->is_active = true;
             $item->save();
 
@@ -140,6 +143,9 @@ final class CreateItem
             'reorderPoint' => $item->reorder_point !== null ? (float) $item->reorder_point : null,
             'safetyStock' => $item->safety_stock !== null ? (float) $item->safety_stock : null,
             'inventoryAccountCode' => $item->inventory_account_code,
+            'invAccountId' => $item->inv_account_id,
+            'incomeAccountId' => $item->income_account_id,
+            'cogsAccountId' => $item->cogs_account_id,
             'isActive' => (bool) $item->is_active,
             'rowVersion' => (int) $item->row_version,
             'createdAt' => $item->created_at?->toIso8601String(),

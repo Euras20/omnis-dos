@@ -10,7 +10,9 @@ use App\Modules\Catalog\Actions\CreateParty;
 use App\Modules\Catalog\Actions\UpdateParty;
 use App\Modules\Catalog\Queries\GetPartyQuery;
 use App\Modules\Catalog\Queries\ListPartiesQuery;
+use App\Modules\Payables\Actions\PostSupplierOpeningBalance;
 use App\Modules\Payables\Queries\GetSupplierStatementQuery;
+use App\Modules\Receivables\Actions\PostCustomerOpeningBalance;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -22,6 +24,8 @@ final class PartyController
         private readonly CreateParty $createParty,
         private readonly UpdateParty $updateParty,
         private readonly GetSupplierStatementQuery $getSupplierStatementQuery,
+        private readonly PostCustomerOpeningBalance $postCustomerOpening,
+        private readonly PostSupplierOpeningBalance $postSupplierOpening,
     ) {
     }
 
@@ -63,5 +67,24 @@ final class PartyController
         $party = $this->updateParty->execute($id, $request->validated());
 
         return response()->json($party);
+    }
+
+    public function openingBalance(string $id, Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'amountMinor' => ['required', 'integer'],
+            'asOfDate' => ['required', 'date'],
+            'dueDate' => ['nullable', 'date'],
+            'reference' => ['nullable', 'string', 'max:128'],
+        ]);
+
+        $party = $this->getPartyQuery->execute($id);
+        $type = $party['partyType'] ?? '';
+
+        $result = $type === 'customer'
+            ? $this->postCustomerOpening->execute($id, $data)
+            : $this->postSupplierOpening->execute($id, $data);
+
+        return response()->json($result, 201);
     }
 }

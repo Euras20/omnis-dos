@@ -383,13 +383,21 @@ final class PostingService
             ->where('company_id', $companyId)
             ->whereIn('id', $ids)
             ->where('is_active', true)
-            ->pluck('id')
-            ->all();
+            ->get(['id', 'code', 'is_locked']);
 
-        $missing = array_diff($ids, $found);
+        $foundIds = $found->pluck('id')->all();
+        $missing = array_diff($ids, $foundIds);
         if ($missing !== []) {
             throw new BusinessRuleException(
                 'Unknown or inactive account(s): '.implode(', ', $missing)
+            );
+        }
+
+        $locked = $found->where('is_locked', true);
+        if ($locked->isNotEmpty()) {
+            $codes = $locked->pluck('code')->filter()->implode(', ');
+            throw new BusinessRuleException(
+                'Account(s) locked (no new postings): '.($codes !== '' ? $codes : $locked->pluck('id')->implode(', '))
             );
         }
     }

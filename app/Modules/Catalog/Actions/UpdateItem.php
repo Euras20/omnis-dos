@@ -213,6 +213,15 @@ final class UpdateItem
             if (array_key_exists('inventoryAccountCode', $data)) {
                 $item->inventory_account_code = $data['inventoryAccountCode'];
             }
+            if (array_key_exists('invAccountId', $data)) {
+                $item->inv_account_id = $data['invAccountId'];
+            }
+            if (array_key_exists('incomeAccountId', $data)) {
+                $item->income_account_id = $data['incomeAccountId'];
+            }
+            if (array_key_exists('cogsAccountId', $data)) {
+                $item->cogs_account_id = $data['cogsAccountId'];
+            }
             if (array_key_exists('isActive', $data)) {
                 $item->is_active = (bool) $data['isActive'];
             }

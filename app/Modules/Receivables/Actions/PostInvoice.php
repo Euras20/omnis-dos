@@ -287,12 +287,30 @@ final class PostInvoice
             }
 
             // Posting: Dr AR (gross), Cr revenue (net), Cr tax accounts
-            $arId = $this->accountResolver->idByCode($companyId, 'ar');
-            $revenueId = $this->accountResolver->idByCode($companyId, 'revenue');
+            // Prefer customer / item overrides when set; otherwise fall back to roles.
+            $party = \App\Models\Party::query()->find($customerId);
+            $arId = $party?->ar_account_id ?? $this->accountResolver->idByCode($companyId, 'ar');
+            $defaultRevenueId = $party?->income_account_id ?? $this->accountResolver->idByCode($companyId, 'revenue');
+
+            $revenueSplits = [];
+            foreach ($lineModels as $line) {
+                $itemIncome = null;
+                if ($line->item_id) {
+                    $item = \App\Models\Item::query()->find($line->item_id);
+                    $itemIncome = $item?->income_account_id;
+                }
+                $acct = $itemIncome ?? $defaultRevenueId;
+                $revenueSplits[$acct] = ($revenueSplits[$acct] ?? 0) + (int) $line->line_net_minor;
+            }
+
             $lines = [
                 new PostingLine(accountId: $arId, debitMinor: $gross, creditMinor: 0, partyId: $customerId, memo: "Invoice {$invoiceNo}"),
-                new PostingLine(accountId: $revenueId, debitMinor: 0, creditMinor: $headerNet, partyId: $customerId, memo: "Invoice {$invoiceNo}"),
             ];
+            foreach ($revenueSplits as $acctId => $amount) {
+                if ($amount > 0) {
+                    $lines[] = new PostingLine(accountId: $acctId, debitMinor: 0, creditMinor: $amount, partyId: $customerId, memo: "Invoice {$invoiceNo}");
+                }
+            }
             if ($headerVat > 0) {
                 $lines[] = new PostingLine(
                     accountId: $this->accountResolver->idByCode($companyId, 'vat'),

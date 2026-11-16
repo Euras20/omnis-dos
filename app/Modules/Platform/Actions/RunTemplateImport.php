@@ -172,22 +172,22 @@ final class RunTemplateImport
 
             $count = $this->insert($type, $parsed, $companyId, $actorId, $partyByCode, $itemBySku, $locationByCode, $accountByCode, $bankImportId);
 
-         $this->auditWriter->write(
-    action: 'import.'.$type,
-    entityType: 'import',
-    entityId: null,
-    detail: ['type' => $type, 'rowCount' => $count],
-    actorId: $actorId,
-);
+            $this->auditWriter->write(
+                action: 'import.'.$type,
+                entityType: 'import',
+                entityId: null,
+                detail: ['type' => $type, 'rowCount' => $count],
+                actorId: $actorId,
+            );
 
-$this->outboxWriter->record([
-    'company_id' => $companyId,
-    'aggregate_type' => 'import',
-    'aggregate_id' => Uuid::v7(),
-    'event_type' => 'import.completed',
-    'payload' => ['importType' => $type, 'rowCount' => $count],
-    'request_id' => $this->companyContext->requestId(),
-]);
+            $this->outboxWriter->record([
+                'company_id' => $companyId,
+                'aggregate_type' => 'import',
+                'aggregate_id' => Uuid::v7(),
+                'event_type' => 'import.completed',
+                'payload' => ['importType' => $type, 'rowCount' => $count],
+                'request_id' => $this->companyContext->requestId(),
+            ]);
 
             return [
                 'type' => $type,
@@ -271,61 +271,10 @@ $this->outboxWriter->record([
         foreach ($parsed as $p) {
             $r = $p['data'];
             match ($type) {
-                'items' => Item::query()->create([
-                    'id' => Uuid::v7(),
-                    'company_id' => $companyId,
-                    'sku' => $r['sku'],
-                    'name' => $r['name'],
-                    'item_type' => $r['item_type'],
-                    'category_code' => $r['category_code'] ?: null,
-                    'unit' => $r['unit'] ?: 'pcs',
-                    'list_price_minor' => $this->money($r['list_price']),
-                    'standard_cost_minor' => $this->money($r['standard_cost']),
-                    'buy_price_minor' => $r['buy_price'] !== '' ? $this->money($r['buy_price']) : null,
-                    'weight_kg' => $r['weight_kg'] !== '' ? $r['weight_kg'] : null,
-                    'inventory_policy' => $r['inventory_policy'] ?: 'Buy',
-                    'lot_controlled' => $this->bool($r['lot_controlled'], true),
-                    'reorder_point' => $r['reorder_point'] !== '' ? $r['reorder_point'] : null,
-                    'safety_stock' => $r['safety_stock'] !== '' ? $r['safety_stock'] : null,
-                    'inventory_account_code' => $r['inventory_account_code'] ?: null,
-                    'is_active' => $this->bool($r['is_active'], true),
-                ]),
-                'customers', 'suppliers' => Party::query()->create([
-                    'id' => Uuid::v7(),
-                    'company_id' => $companyId,
-                    'code' => $r['code'],
-                    'name' => $r['name'],
-                    'party_type' => $type === 'customers' ? 'customer' : 'supplier',
-                    'tin' => $r['tin'] ?: null,
-                    'reg_no' => $r['reg_no'] ?: null,
-                    'city' => $r['city'] ?: null,
-                    'region' => $r['region'] ?: null,
-                    'country' => $r['country'] ?: null,
-                    'address' => $r['address'] ?: null,
-                    'delivery_address' => $r['delivery_address'] ?: null,
-                    'delivery_terms' => $r['delivery_terms'] !== '' ? strtoupper($r['delivery_terms']) : null,
-                    'contact_name' => $r['contact_name'] ?: null,
-                    'email' => $r['email'] ?: null,
-                    'phone' => $r['phone'] ?: null,
-                    'payment_terms' => $r['payment_terms'] ?: null,
-                    'credit_limit_minor' => $r['credit_limit'] !== '' ? $this->money($r['credit_limit']) : null,
-                    'currency' => $this->currency($r['currency']),
-                    'vat_registered' => $this->bool($r['vat_registered'], false),
-                    'is_active' => $this->bool($r['is_active'], true),
-                ]),
-                'accounts' => Account::query()->create([
-                    'id' => Uuid::v7(),
-                    'company_id' => $companyId,
-                    'code' => $r['code'],
-                    'name' => $r['name'],
-                    'category' => $r['category'],
-                    'kind' => $r['kind'] ?: 'detail',
-                    'currency' => $r['currency'] !== '' ? $this->currency($r['currency']) : null,
-                    'fs_line_item' => $r['fs_line_item'] ?: null,
-                    'fs_sub_line' => $r['fs_sub_line'] ?: null,
-                    'normal_balance' => $r['normal_balance'] ?: 'debit',
-                    'is_active' => $this->bool($r['is_active'], true),
-                ]),
+                'items' => $this->insertItem($r, $companyId, $accountByCode, $locationByCode, $actorId),
+                'customers', 'suppliers' => $this->insertParty($type, $r, $companyId, $accountByCode, $actorId),
+                'accounts' => $this->insertAccount($r, $companyId, $accountByCode, $actorId),
+                'bank-accounts' => $this->insertBankAccount($r, $companyId, $accountByCode, $actorId),
                 'receivables' => $this->insertInvoice($r, $companyId, $actorId, $partyByCode),
                 'payables' => $this->insertBill($r, $companyId, $actorId, $partyByCode, $accountByCode),
                 'delivery' => StockMovement::query()->create([
@@ -544,5 +493,164 @@ $this->outboxWriter->record([
         $csv = str_replace(["\r\n", "\r"], "\n", $csv);
         $lines = array_values(array_filter(explode("\n", $csv), fn ($l) => trim($l) !== ''));
         return array_map(fn ($l) => str_getcsv($l), $lines);
+    }
+
+    private function resolveAccount(?string $code, array $accountByCode): ?string
+    {
+        if ($code === null || $code === '') {
+            return null;
+        }
+
+        return $accountByCode[$code] ?? null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $r
+     * @param  array<string, string>  $accountByCode
+     * @param  array<string, string>  $locationByCode
+     */
+    private function insertItem(array $r, string $companyId, array $accountByCode, array $locationByCode, ?string $actorId): void
+    {
+        $item = Item::query()->create([
+            'id' => Uuid::v7(),
+            'company_id' => $companyId,
+            'sku' => $r['sku'],
+            'name' => $r['name'],
+            'item_type' => $r['item_type'],
+            'category_code' => $r['category_code'] ?: null,
+            'unit' => $r['unit'] ?: 'pcs',
+            'list_price_minor' => $this->money($r['list_price']),
+            'standard_cost_minor' => $this->money($r['standard_cost']),
+            'buy_price_minor' => $r['buy_price'] !== '' ? $this->money($r['buy_price']) : null,
+            'weight_kg' => $r['weight_kg'] !== '' ? $r['weight_kg'] : null,
+            'inventory_policy' => $r['inventory_policy'] ?: 'Buy',
+            'lot_controlled' => $this->bool($r['lot_controlled'], true),
+            'reorder_point' => $r['reorder_point'] !== '' ? $r['reorder_point'] : null,
+            'safety_stock' => $r['safety_stock'] !== '' ? $r['safety_stock'] : null,
+            'inventory_account_code' => $r['inventory_account_code'] ?: null,
+            'inv_account_id' => $this->resolveAccount($r['inv_account_code'] ?? null, $accountByCode),
+            'income_account_id' => $this->resolveAccount($r['income_account_code'] ?? null, $accountByCode),
+            'cogs_account_id' => $this->resolveAccount($r['cogs_account_code'] ?? null, $accountByCode),
+            'is_active' => $this->bool($r['is_active'], true),
+        ]);
+
+        $qty = $r['opening_qty'] ?? '';
+        if ($qty !== '' && (float) $qty > 0) {
+            app(\App\Modules\Inventory\Actions\PostItemOpeningBalance::class)->execute($item->id, [
+                'qty' => $qty,
+                'unitCostMinor' => $this->money($r['opening_unit_cost'] ?? '0'),
+                'locationId' => $locationByCode[$r['opening_location_code'] ?? ''] ?? null,
+                'asOfDate' => $r['opening_date'] ?: date('Y-m-d'),
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $r
+     * @param  array<string, string>  $accountByCode
+     */
+    private function insertParty(string $type, array $r, string $companyId, array $accountByCode, ?string $actorId): void
+    {
+        $party = Party::query()->create([
+            'id' => Uuid::v7(),
+            'company_id' => $companyId,
+            'code' => $r['code'],
+            'name' => $r['name'],
+            'party_type' => $type === 'customers' ? 'customer' : 'supplier',
+            'tin' => $r['tin'] ?: null,
+            'reg_no' => $r['reg_no'] ?: null,
+            'city' => $r['city'] ?: null,
+            'region' => $r['region'] ?: null,
+            'country' => $r['country'] ?: null,
+            'address' => $r['address'] ?: null,
+            'delivery_address' => $r['delivery_address'] ?: null,
+            'delivery_terms' => $r['delivery_terms'] !== '' ? strtoupper($r['delivery_terms']) : null,
+            'contact_name' => $r['contact_name'] ?: null,
+            'email' => $r['email'] ?: null,
+            'phone' => $r['phone'] ?: null,
+            'payment_terms' => $r['payment_terms'] ?: null,
+            'credit_limit_minor' => $r['credit_limit'] !== '' ? $this->money($r['credit_limit']) : null,
+            'currency' => $this->currency($r['currency']),
+            'vat_registered' => $this->bool($r['vat_registered'], false),
+            'ar_account_id' => $this->resolveAccount($r['ar_account_code'] ?? null, $accountByCode),
+            'income_account_id' => $this->resolveAccount($r['income_account_code'] ?? null, $accountByCode),
+            'ap_account_id' => $this->resolveAccount($r['ap_account_code'] ?? null, $accountByCode),
+            'purchase_account_id' => $this->resolveAccount($r['purchase_account_code'] ?? null, $accountByCode),
+            'is_active' => $this->bool($r['is_active'], true),
+        ]);
+
+        $ob = $r['opening_balance'] ?? '';
+        if ($ob !== '' && $this->money($ob) > 0) {
+            $payload = [
+                'amountMinor' => $this->money($ob),
+                'asOfDate' => $r['opening_date'] ?: date('Y-m-d'),
+                'dueDate' => $r['opening_due_date'] ?: null,
+                'reference' => $r['opening_reference'] ?: null,
+            ];
+            if ($type === 'customers') {
+                app(\App\Modules\Receivables\Actions\PostCustomerOpeningBalance::class)->execute($party->id, $payload);
+            } else {
+                app(\App\Modules\Payables\Actions\PostSupplierOpeningBalance::class)->execute($party->id, $payload);
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $r
+     * @param  array<string, string>  $accountByCode
+     */
+    private function insertAccount(array $r, string $companyId, array $accountByCode, ?string $actorId): void
+    {
+        $parentId = $this->resolveAccount($r['parent_code'] ?? null, $accountByCode);
+
+        Account::query()->create([
+            'id' => Uuid::v7(),
+            'company_id' => $companyId,
+            'parent_id' => $parentId,
+            'code' => $r['code'],
+            'name' => $r['name'],
+            'description' => $r['description'] ?: null,
+            'category' => $r['category'],
+            'detail_type' => $r['detail_type'] ?: null,
+            'kind' => $r['kind'] ?: 'detail',
+            'node_type' => 'POSTING',
+            'source' => 'CLIENT',
+            'currency' => $r['currency'] !== '' ? $this->currency($r['currency']) : null,
+            'fs_line_item' => $r['fs_line_item'] ?: null,
+            'fs_sub_line' => $r['fs_sub_line'] ?: null,
+            'normal_balance' => $r['normal_balance'] ?: 'debit',
+            'is_active' => $this->bool($r['is_active'], true),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $r
+     * @param  array<string, string>  $accountByCode
+     */
+    private function insertBankAccount(array $r, string $companyId, array $accountByCode, ?string $actorId): void
+    {
+        $glId = $this->resolveAccount($r['gl_account_code'] ?? null, $accountByCode);
+
+        $bank = \App\Models\CompanyBankAccount::query()->create([
+            'id' => Uuid::v7(),
+            'company_id' => $companyId,
+            'type' => $r['type'],
+            'gl_account_id' => $glId,
+            'bank_name' => $r['bank_name'],
+            'account_name' => $r['account_name'],
+            'account_number' => $r['account_number'] ?: '',
+            'branch' => $r['branch'] ?: null,
+            'swift' => $r['swift'] ?: null,
+            'currency' => $this->currency($r['currency']),
+            'is_active' => $this->bool($r['is_active'], true),
+        ]);
+
+        $ob = $r['opening_balance'] ?? '';
+        if ($ob !== '' && $this->money($ob) !== 0 && $glId !== null) {
+            app(\App\Modules\Treasury\Actions\PostBankOpeningBalance::class)->execute($bank->id, [
+                'amountMinor' => $this->money($ob),
+                'asOfDate' => $r['opening_date'] ?: date('Y-m-d'),
+            ]);
+        }
     }
 }

@@ -48,6 +48,9 @@ final class UpdateItemRequest extends FormRequest
             'safetyStock' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'safety' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'inventoryAccountCode' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'invAccountId' => ['sometimes', 'nullable', 'uuid'],
+            'incomeAccountId' => ['sometimes', 'nullable', 'uuid'],
+            'cogsAccountId' => ['sometimes', 'nullable', 'uuid'],
             'isActive' => ['sometimes', 'nullable', 'boolean'],
         ];
     }
