@@ -26,6 +26,8 @@ final class StoreItemRequest extends FormRequest
             'categoryCode' => ['nullable', 'string', 'max:32'],
             'unit' => ['nullable', 'string', 'max:32'],
             'listPriceMinor' => ['nullable', 'integer', 'min:0'],
+            'wholesalePriceMinor' => ['nullable', 'integer', 'min:0'],
+            'retailPriceMinor' => ['nullable', 'integer', 'min:0'],
             'standardCostMinor' => ['nullable', 'integer', 'min:0'],
             'buyPriceMinor' => ['nullable', 'integer', 'min:0'],
             'weightKg' => ['nullable', 'numeric', 'min:0'],

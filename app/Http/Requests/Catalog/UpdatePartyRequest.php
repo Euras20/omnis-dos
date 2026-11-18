@@ -21,6 +21,7 @@ final class UpdatePartyRequest extends FormRequest
         return [
             'rowVersion' => ['required', 'integer', 'min:1'],
             'name' => ['sometimes', 'string', 'max:255'],
+            'salesChannel' => ['nullable', 'string', 'in:wholesale,retail'],
             'tin' => ['nullable', 'string', 'max:64'],
             'regNo' => ['nullable', 'string', 'max:64'],
             'city' => ['nullable', 'string', 'max:128'],

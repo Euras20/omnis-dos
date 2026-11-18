@@ -54,6 +54,8 @@ class Item extends Model
     {
         return [
             'list_price_minor' => 'integer',
+            'wholesale_price_minor' => 'integer',
+            'retail_price_minor' => 'integer',
             'standard_cost_minor' => 'integer',
             'buy_price_minor' => 'integer',
             'weight_kg' => 'decimal:3',

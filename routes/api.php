@@ -112,6 +112,7 @@ Route::prefix('v1')->group(function () {
         // --- Ledger: queries ---
         Route::get('/accounts', [AccountController::class, 'index']);
         Route::get('/accounts/tree', [AccountController::class, 'tree']);
+        Route::get('/accounts/group-lookups', [AccountController::class, 'groupLookups']);
         Route::get('/accounts/roles', [AccountController::class, 'roles']);
         Route::get('/journals', [JournalController::class, 'index']);
         Route::get('/journals/{id}', [JournalController::class, 'show']);

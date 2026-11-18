@@ -81,6 +81,14 @@ final class CreateSalesOrder
         $taxRates = $this->resolveTaxRates($companyId, $orderDate);
         $combinedTaxRate = $taxRates['vat'] + $taxRates['nhil'] + $taxRates['getfund'];
 
+        $channel = isset($data['salesChannel']) ? strtolower((string) $data['salesChannel']) : null;
+        if ($channel !== null && ! in_array($channel, ['wholesale', 'retail'], true)) {
+            throw new BusinessRuleException('salesChannel must be wholesale or retail.');
+        }
+        if ($channel === null) {
+            $channel = $customer->sales_channel;
+        }
+
         return DB::transaction(function () use (
             $companyId,
             $customerId,
@@ -97,6 +105,7 @@ final class CreateSalesOrder
             $requestId,
             $combinedTaxRate,
             $taxRates,
+            $channel,
         ) {
             $orderId = Uuid::v7();
             $orderNo = $this->nextNumber($companyId, $orderDate, 'sales_order');
@@ -134,6 +143,13 @@ final class CreateSalesOrder
                     if ($description === '') {
                         $description = (string) $item->name;
                     }
+                    if ($unitPrice === 0) {
+                        $unitPrice = match ($channel) {
+                            'wholesale' => (int) ($item->wholesale_price_minor ?? $item->list_price_minor),
+                            'retail' => (int) ($item->retail_price_minor ?? $item->list_price_minor),
+                            default => (int) $item->list_price_minor,
+                        };
+                    }
                 } elseif ($description === '') {
                     throw new BusinessRuleException("Line {$index}: description is required when itemId is omitted.");
                 }
@@ -168,6 +184,7 @@ final class CreateSalesOrder
                 'company_id' => $companyId,
                 'order_no' => $orderNo,
                 'customer_id' => $customerId,
+                'sales_channel' => $channel,
                 'quotation_id' => $quotationId,
                 'customer_po_ref' => $customerPoRef,
                 'order_type_id' => $orderTypeId,
@@ -295,6 +312,7 @@ final class CreateSalesOrder
             'id' => $order->id,
             'orderNo' => $order->order_no,
             'customerId' => $order->customer_id,
+            'salesChannel' => $order->sales_channel,
             'quotationId' => $order->quotation_id,
             'customerPoRef' => $order->customer_po_ref,
             'orderDate' => $order->order_date?->format('Y-m-d'),

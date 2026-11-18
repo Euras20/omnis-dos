@@ -50,6 +50,7 @@ final class UpdateParty
 
             $mutable = [
                 'name' => 'name',
+                'salesChannel' => 'sales_channel',
                 'tin' => 'tin',
                 'regNo' => 'reg_no',
                 'city' => 'city',

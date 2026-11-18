@@ -33,6 +33,7 @@ class Party extends Model
         'code',
         'name',
         'party_type',
+        'sales_channel',
         'tin',
         'reg_no',
         'city',

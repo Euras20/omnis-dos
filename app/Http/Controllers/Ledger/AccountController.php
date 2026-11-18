@@ -16,6 +16,7 @@ use App\Modules\Ledger\Actions\LockAccount;
 use App\Modules\Ledger\Actions\MapAccountRole;
 use App\Modules\Ledger\Actions\UnlockAccount;
 use App\Modules\Ledger\Actions\UpdateAccount;
+use App\Modules\Ledger\Queries\AccountGroupLookupsQuery;
 use App\Modules\Ledger\Queries\AccountTreeQuery;
 use App\Modules\Ledger\Queries\ListAccountRolesQuery;
 use App\Modules\Ledger\Queries\ListAccountsQuery;
@@ -27,6 +28,7 @@ final class AccountController
     public function __construct(
         private readonly ListAccountsQuery $listAccountsQuery,
         private readonly AccountTreeQuery $accountTreeQuery,
+        private readonly AccountGroupLookupsQuery $groupLookupsQuery,
         private readonly ListAccountRolesQuery $listAccountRolesQuery,
         private readonly CreateAccount $createAccount,
         private readonly UpdateAccount $updateAccount,
@@ -55,6 +57,11 @@ final class AccountController
     public function tree(): JsonResponse
     {
         return response()->json($this->accountTreeQuery->execute());
+    }
+
+    public function groupLookups(): JsonResponse
+    {
+        return response()->json($this->groupLookupsQuery->execute());
     }
 
     public function roles(): JsonResponse

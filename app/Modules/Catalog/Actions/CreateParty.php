@@ -61,6 +61,7 @@ final class CreateParty
             $party->code = $code;
             $party->name = trim((string) $data['name']);
             $party->party_type = $partyType;
+            $party->sales_channel = isset($data['salesChannel']) ? strtolower((string) $data['salesChannel']) : null;
             $party->tin = $data['tin'] ?? null;
             $party->reg_no = $data['regNo'] ?? null;
             $party->city = $data['city'] ?? null;
@@ -126,6 +127,7 @@ final class CreateParty
             'code' => $party->code,
             'name' => $party->name,
             'partyType' => $party->party_type,
+            'salesChannel' => $party->sales_channel,
             'tin' => $party->tin,
             'regNo' => $party->reg_no,
             'city' => $party->city,

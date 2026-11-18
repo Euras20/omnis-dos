@@ -23,6 +23,7 @@ final class StorePartyRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'partyType' => ['required_without:type', 'string', 'in:customer,supplier,carrier,broker'],
             'type' => ['required_without:partyType', 'string', 'in:customer,supplier,carrier,broker'],
+            'salesChannel' => ['nullable', 'string', 'in:wholesale,retail'],
             'tin' => ['nullable', 'string', 'max:64'],
             'regNo' => ['nullable', 'string', 'max:64'],
             'city' => ['nullable', 'string', 'max:128'],

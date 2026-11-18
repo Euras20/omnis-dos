@@ -150,6 +150,12 @@ final class UpdateItem
             if (array_key_exists('listPriceMinor', $data) || array_key_exists('priceMinor', $data)) {
                 $item->list_price_minor = (int) ($data['listPriceMinor'] ?? $data['priceMinor'] ?? 0);
             }
+            if (array_key_exists('wholesalePriceMinor', $data)) {
+                $item->wholesale_price_minor = $data['wholesalePriceMinor'] !== null ? (int) $data['wholesalePriceMinor'] : null;
+            }
+            if (array_key_exists('retailPriceMinor', $data)) {
+                $item->retail_price_minor = $data['retailPriceMinor'] !== null ? (int) $data['retailPriceMinor'] : null;
+            }
             if (array_key_exists('standardCostMinor', $data) || array_key_exists('costMinor', $data)) {
                 $item->standard_cost_minor = (int) ($data['standardCostMinor'] ?? $data['costMinor'] ?? 0);
             }

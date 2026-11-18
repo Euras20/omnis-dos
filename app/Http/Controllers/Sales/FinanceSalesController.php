@@ -23,6 +23,7 @@ final class FinanceSalesController
             'to' => $request->query('to'),
             'type' => $request->query('type'),
             'status' => $request->query('status'),
+            'channel' => $request->query('channel'),
             'limit' => $request->query('limit'),
             'offset' => $request->query('offset'),
         ]));

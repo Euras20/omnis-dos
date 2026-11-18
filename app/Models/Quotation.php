@@ -24,6 +24,7 @@ class Quotation extends Model
         'company_id',
         'quotation_no',
         'customer_id',
+        'sales_channel',
         'quotation_date',
         'valid_until',
         'currency',

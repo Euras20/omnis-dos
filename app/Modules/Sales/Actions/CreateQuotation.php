@@ -73,6 +73,15 @@ final class CreateQuotation
         if ($discountPercent < 0 || $discountPercent > 100) {
             throw new BusinessRuleException('discountPercent must be between 0 and 100.');
         }
+
+        $channel = isset($data['salesChannel']) ? strtolower((string) $data['salesChannel']) : null;
+        if ($channel !== null && ! in_array($channel, ['wholesale', 'retail'], true)) {
+            throw new BusinessRuleException('salesChannel must be wholesale or retail.');
+        }
+        if ($channel === null) {
+            $customer = \App\Models\Party::query()->find($customerId);
+            $channel = $customer?->sales_channel;
+        }
         $validUntil = isset($data['validUntil']) ? (string) $data['validUntil'] : null;
         $memo = isset($data['memo']) ? trim((string) $data['memo']) : null;
         $deliveryType = DeliveryType::normalise(isset($data['deliveryType']) ? (string) $data['deliveryType'] : null);
@@ -117,6 +126,16 @@ final class CreateQuotation
                 $description = trim((string) ($raw['description'] ?? ''));
                 $qty = (string) ($raw['qty'] ?? '');
                 $unitPrice = (int) ($raw['unitPriceMinor'] ?? $raw['unit_price_minor'] ?? 0);
+                if ($unitPrice === 0 && $itemId) {
+                    $item = \App\Models\Item::query()->find($itemId);
+                    if ($item !== null) {
+                        $unitPrice = match ($channel) {
+                            'wholesale' => (int) ($item->wholesale_price_minor ?? $item->list_price_minor),
+                            'retail' => (int) ($item->retail_price_minor ?? $item->list_price_minor),
+                            default => (int) $item->list_price_minor,
+                        };
+                    }
+                }
                 $unit = (string) ($raw['unit'] ?? 'pcs');
 
                 if ($qty === '' || ! is_numeric($qty) || (float) $qty <= 0) {
@@ -181,6 +200,7 @@ final class CreateQuotation
                 'company_id' => $companyId,
                 'quotation_no' => $quotationNo,
                 'customer_id' => $customerId,
+                'sales_channel' => $channel,
                 'quotation_date' => $quotationDate,
                 'valid_until' => $validUntil,
                 'currency' => $currency,
@@ -310,6 +330,7 @@ final class CreateQuotation
             'id' => $quotation->id,
             'quotationNo' => $quotation->quotation_no,
             'customerId' => $quotation->customer_id,
+            'salesChannel' => $quotation->sales_channel,
             'quotationDate' => $quotation->quotation_date?->format('Y-m-d'),
             'validUntil' => $quotation->valid_until?->format('Y-m-d'),
             'currency' => $quotation->currency,

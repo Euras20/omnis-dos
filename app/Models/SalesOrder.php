@@ -24,6 +24,7 @@ class SalesOrder extends Model
         'company_id',
         'order_no',
         'customer_id',
+        'sales_channel',
         'quotation_id',
         'customer_po_ref',
         'order_type_id',

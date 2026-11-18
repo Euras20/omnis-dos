@@ -19,6 +19,8 @@ final class AccountRoleCatalogue
             'CUSTOMER_AR' => ['label' => 'Trade receivables', 'accountClass' => 'asset'],
             'CUSTOMER_ADVANCES' => ['label' => 'Customer advances', 'accountClass' => 'liability'],
             'SERVICE_REVENUE' => ['label' => 'Service revenue', 'accountClass' => 'income'],
+            'WHOLESALE_REVENUE' => ['label' => 'Wholesale sales', 'accountClass' => 'income'],
+            'RETAIL_REVENUE' => ['label' => 'Retail sales', 'accountClass' => 'income'],
             'VAT_PAYABLE' => ['label' => 'VAT payable', 'accountClass' => 'liability'],
             'NHIL_PAYABLE' => ['label' => 'NHIL payable', 'accountClass' => 'liability'],
             'GETFUND_PAYABLE' => ['label' => 'GETFund payable', 'accountClass' => 'liability'],

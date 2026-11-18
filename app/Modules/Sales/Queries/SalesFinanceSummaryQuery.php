@@ -96,6 +96,7 @@ final class SalesFinanceSummaryQuery
                 'orderNo' => $order->order_no,
                 'customerId' => $order->customer_id,
                 'customerName' => $order->customer?->name,
+                'salesChannel' => $order->sales_channel,
                 'orderDate' => $order->order_date?->toDateString(),
                 'requiredDate' => $order->required_date?->toDateString(),
                 'currency' => $order->currency,

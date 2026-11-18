@@ -17,6 +17,7 @@ use App\Modules\Ledger\Domain\PostingKey;
 use App\Modules\Ledger\Domain\PostingLine;
 use App\Modules\Ledger\Domain\PostingRequest;
 use App\Modules\Ledger\Services\PostingService;
+use App\Modules\Ledger\Services\RoleResolver;
 use App\Modules\Receivables\Domain\TaxBreakdown;
 use App\Modules\Receivables\Services\AccountResolver;
 use App\Shared\Audit\AuditWriter;
@@ -36,6 +37,7 @@ final class PostInvoice
         private readonly PermissionChecker $permissionChecker,
         private readonly PostingService $postingService,
         private readonly AccountResolver $accountResolver,
+        private readonly RoleResolver $roleResolver,
         private readonly AuditWriter $auditWriter,
         private readonly OutboxWriter $outboxWriter,
     ) {
@@ -265,6 +267,10 @@ final class PostInvoice
             $invoice->invoice_no = $invoiceNo;
             $invoice->customer_id = $customerId;
             $invoice->sales_order_id = $salesOrderId;
+            $channel = $salesOrderId !== null
+                ? SalesOrder::query()->where('id', $salesOrderId)->value('sales_channel')
+                : null;
+            $invoice->sales_channel = $channel;
             $invoice->invoice_date = $invoiceDate;
             $invoice->due_date = $dueDate;
             $invoice->currency = $currency;
@@ -290,7 +296,24 @@ final class PostInvoice
             // Prefer customer / item overrides when set; otherwise fall back to roles.
             $party = \App\Models\Party::query()->find($customerId);
             $arId = $party?->ar_account_id ?? $this->accountResolver->idByCode($companyId, 'ar');
-            $defaultRevenueId = $party?->income_account_id ?? $this->accountResolver->idByCode($companyId, 'revenue');
+
+            $channelRole = match ($invoice->sales_channel) {
+                'wholesale' => 'WHOLESALE_REVENUE',
+                'retail' => 'RETAIL_REVENUE',
+                default => null,
+            };
+            $channelRevenueId = null;
+            if ($channelRole !== null) {
+                $channelRevenueId = $this->roleResolver->idOrNull($companyId, $channelRole);
+                if ($channelRevenueId === null) {
+                    throw new \App\Exceptions\BusinessRuleException(
+                        "Map the {$channelRole} account role before posting a {$invoice->sales_channel} invoice."
+                    );
+                }
+            }
+            $defaultRevenueId = $party?->income_account_id
+                ?? $channelRevenueId
+                ?? $this->accountResolver->idByCode($companyId, 'revenue');
 
             $revenueSplits = [];
             foreach ($lineModels as $line) {

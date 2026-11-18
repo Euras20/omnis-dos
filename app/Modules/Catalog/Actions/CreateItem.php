@@ -90,6 +90,8 @@ final class CreateItem
             $item->category_code = $categoryCode;
             $item->unit = (string) ($data['unit'] ?? 'pcs');
             $item->list_price_minor = (int) ($data['listPriceMinor'] ?? $data['priceMinor'] ?? 0);
+            $item->wholesale_price_minor = isset($data['wholesalePriceMinor']) ? (int) $data['wholesalePriceMinor'] : null;
+            $item->retail_price_minor = isset($data['retailPriceMinor']) ? (int) $data['retailPriceMinor'] : null;
             $item->standard_cost_minor = (int) ($data['standardCostMinor'] ?? $data['costMinor'] ?? 0);
             $item->buy_price_minor = isset($data['buyPriceMinor']) ? (int) $data['buyPriceMinor'] : null;
             $item->weight_kg = $data['weightKg'] ?? $data['weight'] ?? null;
@@ -132,6 +134,8 @@ final class CreateItem
             'categoryCode' => $item->category_code,
             'unit' => $item->unit,
             'listPriceMinor' => (int) $item->list_price_minor,
+            'wholesalePriceMinor' => $item->wholesale_price_minor,
+            'retailPriceMinor' => $item->retail_price_minor,
             'standardCostMinor' => (int) $item->standard_cost_minor,
             'buyPriceMinor' => $item->buy_price_minor !== null ? (int) $item->buy_price_minor : null,
             'weightKg' => $item->weight_kg !== null ? (float) $item->weight_kg : null,

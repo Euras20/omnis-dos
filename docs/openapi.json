@@ -1000,7 +1000,19 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PartyWrite"
+                "$ref": "#/components/schemas/PartyWrite",
+                "properties": {
+                  "salesChannel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "wholesale",
+                      "retail"
+                    ]
+                  }
+                }
               }
             }
           }
@@ -1484,7 +1496,23 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ItemWrite"
+                "$ref": "#/components/schemas/ItemWrite",
+                "properties": {
+                  "wholesalePriceMinor": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "retailPriceMinor": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                }
               }
             }
           }
@@ -3938,6 +3966,16 @@
                         }
                       }
                     }
+                  },
+                  "salesChannel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "wholesale",
+                      "retail"
+                    ]
                   }
                 }
               }
@@ -4212,7 +4250,19 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SalesOrderWrite"
+                "$ref": "#/components/schemas/SalesOrderWrite",
+                "properties": {
+                  "salesChannel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "wholesale",
+                      "retail"
+                    ]
+                  }
+                }
               }
             }
           }
@@ -7928,7 +7978,19 @@
         ],
         "summary": "Sales activity",
         "operationId": "salesActivity",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "channel",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "wholesale",
+                "retail"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK"
@@ -11299,6 +11361,30 @@
           }
         }
       }
+    },
+    "/accounts/group-lookups": {
+      "get": {
+        "tags": [
+          "Ledger"
+        ],
+        "summary": "Account group lookup lists (main groups and subgroups)",
+        "operationId": "accountGroupLookups",
+        "responses": {
+          "200": {
+            "description": "Lookups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -11647,6 +11733,17 @@
               "integer",
               "null"
             ]
+          },
+          "salesChannel": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "wholesale",
+              "retail",
+              null
+            ]
           }
         }
       },
@@ -11786,6 +11883,18 @@
             ]
           },
           "openingBalanceMinor": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "wholesalePriceMinor": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "retailPriceMinor": {
             "type": [
               "integer",
               "null"

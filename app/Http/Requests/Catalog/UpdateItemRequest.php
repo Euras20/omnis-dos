@@ -31,6 +31,8 @@ final class UpdateItemRequest extends FormRequest
             'unit' => ['sometimes', 'nullable', 'string', 'max:32'],
             'listPriceMinor' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'priceMinor' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'wholesalePriceMinor' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'retailPriceMinor' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'standardCostMinor' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'costMinor' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'buyPriceMinor' => ['sometimes', 'nullable', 'integer', 'min:0'],

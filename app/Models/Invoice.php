@@ -24,6 +24,7 @@ class Invoice extends Model
         'company_id',
         'invoice_no',
         'customer_id',
+        'sales_channel',
         'sales_order_id',
         'invoice_date',
         'due_date',

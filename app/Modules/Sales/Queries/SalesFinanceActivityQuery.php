@@ -37,6 +37,7 @@ final class SalesFinanceActivityQuery
         $to = isset($filters['to']) ? (string) $filters['to'] : null;
         $type = isset($filters['type']) ? (string) $filters['type'] : null;
         $status = isset($filters['status']) ? (string) $filters['status'] : null;
+        $channel = isset($filters['channel']) ? strtolower((string) $filters['channel']) : null;
         $limit = min(max((int) ($filters['limit'] ?? 100), 1), 500);
         $offset = max((int) ($filters['offset'] ?? 0), 0);
 
@@ -53,6 +54,9 @@ final class SalesFinanceActivityQuery
             if ($status) {
                 $q->where('status', $status);
             }
+            if ($channel) {
+                $q->where('sales_channel', $channel);
+            }
             foreach ($q->orderByDesc('quotation_date')->limit(500)->get() as $r) {
                 $rows[] = [
                     'date' => $r->quotation_date,
@@ -61,6 +65,7 @@ final class SalesFinanceActivityQuery
                     'no' => $r->quotation_no,
                     'customerId' => $r->customer_id,
                     'customerName' => null,
+                    'salesChannel' => $r->sales_channel ?? null,
                     'currency' => $r->currency,
                     'amountMinor' => (int) $r->gross_minor,
                     'status' => $r->status,
@@ -79,6 +84,9 @@ final class SalesFinanceActivityQuery
             if ($status) {
                 $q->where('status', $status);
             }
+            if ($channel) {
+                $q->where('sales_channel', $channel);
+            }
             foreach ($q->orderByDesc('order_date')->limit(500)->get() as $r) {
                 $rows[] = [
                     'date' => $r->order_date,
@@ -87,6 +95,7 @@ final class SalesFinanceActivityQuery
                     'no' => $r->order_no,
                     'customerId' => $r->customer_id,
                     'customerName' => null,
+                    'salesChannel' => $r->sales_channel ?? null,
                     'currency' => $r->currency,
                     'amountMinor' => (int) $r->gross_minor,
                     'status' => $r->status,
@@ -105,6 +114,9 @@ final class SalesFinanceActivityQuery
             if ($status) {
                 $q->where('status', $status);
             }
+            if ($channel) {
+                $q->where('sales_channel', $channel);
+            }
             foreach ($q->orderByDesc('invoice_date')->limit(500)->get() as $r) {
                 $rows[] = [
                     'date' => $r->invoice_date,
@@ -113,6 +125,7 @@ final class SalesFinanceActivityQuery
                     'no' => $r->invoice_no,
                     'customerId' => $r->customer_id,
                     'customerName' => null,
+                    'salesChannel' => $r->sales_channel ?? null,
                     'currency' => $r->currency,
                     'amountMinor' => (int) $r->gross_minor,
                     'status' => $r->status,
@@ -166,6 +179,7 @@ final class SalesFinanceActivityQuery
                     'no' => $r->receipt_no,
                     'customerId' => $r->customer_id,
                     'customerName' => null,
+                    'salesChannel' => $r->sales_channel ?? null,
                     'currency' => $r->currency,
                     'amountMinor' => (int) $r->total_minor,
                     'status' => 'banked',
