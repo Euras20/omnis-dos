@@ -8,6 +8,7 @@ use App\Exceptions\BusinessRuleException;
 use App\Exceptions\ConflictException;
 use App\Models\Account;
 use App\Models\Journal;
+use App\Modules\Ledger\Services\RoleResolver;
 use App\Shared\Audit\AuditWriter;
 use App\Shared\Company\CompanyContext;
 use App\Shared\Permissions\PermissionChecker;
