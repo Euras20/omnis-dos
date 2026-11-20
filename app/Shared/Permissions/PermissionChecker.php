@@ -87,11 +87,13 @@ final class PermissionChecker
     }
 
     /**
-     * True when the user holds the system administrator role
-     * (code `admin` or `system_administrator`).
+     * True when the user is a system administrator and should bypass
+     * same-actor SoD so one admin account can complete every step.
      *
-     * System administrators bypass runtime same-actor SoD checks so a single
-     * admin account can complete every step of a workflow.
+     * Matches any of:
+     * - role code `admin` or `system_administrator`
+     * - a system role whose name is System Administrator
+     * - holding both admin.users and admin.roles
      */
     public function isSystemAdministrator(?string $userId): bool
     {
@@ -103,14 +105,39 @@ final class PermissionChecker
             return false;
         }
 
+        $companyId = $this->companyContext->companyId();
+
         try {
-            return DB::table('user_role as ur')
+            $byRole = DB::table('user_role as ur')
                 ->join('role as r', 'r.id', '=', 'ur.role_id')
-                ->where('ur.company_id', $this->companyContext->companyId())
+                ->where('ur.company_id', $companyId)
                 ->where('ur.user_id', $userId)
-                ->whereIn('r.code', ['admin', 'system_administrator'])
                 ->where('r.is_active', true)
+                ->where(function ($q) {
+                    $q->whereIn('r.code', ['admin', 'system_administrator'])
+                        ->orWhere(function ($q2) {
+                            $q2->where('r.is_system', true)
+                                ->whereRaw("lower(r.name) like '%administrator%'");
+                        });
+                })
                 ->exists();
+
+            if ($byRole) {
+                return true;
+            }
+
+            // Admin by the two defining permissions, regardless of role code.
+            $adminPerms = DB::table('user_role as ur')
+                ->join('role_permission as rp', 'rp.role_id', '=', 'ur.role_id')
+                ->where('ur.company_id', $companyId)
+                ->where('ur.user_id', $userId)
+                ->whereIn('rp.permission', ['admin.users', 'admin.roles'])
+                ->distinct()
+                ->pluck('rp.permission')
+                ->all();
+
+            return in_array('admin.users', $adminPerms, true)
+                && in_array('admin.roles', $adminPerms, true);
         } catch (\Throwable) {
             return false;
         }

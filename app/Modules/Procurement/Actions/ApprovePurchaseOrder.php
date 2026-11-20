@@ -54,7 +54,11 @@ final class ApprovePurchaseOrder
                 );
             }
 
-            if ($po->created_by !== null && $po->created_by === $actorId) {
+            if (
+                $po->created_by !== null
+                && $po->created_by === $actorId
+                && ! $this->permissionChecker->isSystemAdministrator($actorId)
+            ) {
                 throw new BusinessRuleException(
                     'Segregation of duties: the approver must differ from the creator.'
                 );
