@@ -2158,6 +2158,13 @@
                   },
                   "isActive": {
                     "type": "boolean"
+                  },
+                  "parentId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uuid"
                   }
                 }
               }
@@ -4301,6 +4308,72 @@
         "responses": {
           "200": {
             "description": "Sales order"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "description": "Returns salesChannel, orderTypeId, orderTypeName."
+      },
+      "patch": {
+        "tags": [
+          "Sales"
+        ],
+        "summary": "Update sales order channel or order type (reprices lines on channel change)",
+        "operationId": "updateSalesOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "salesChannel": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "wholesale",
+                      "retail"
+                    ]
+                  },
+                  "orderTypeId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -9148,6 +9221,33 @@
             "required": false,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "orderTypeId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "wholesale",
+                "retail"
+              ]
             }
           }
         ],

@@ -72,6 +72,11 @@ class SalesOrder extends Model
         return $this->belongsTo(Party::class, 'customer_id');
     }
 
+    public function orderType(): BelongsTo
+    {
+        return $this->belongsTo(OrderType::class, 'order_type_id');
+    }
+
     public function quotation(): BelongsTo
     {
         return $this->belongsTo(Quotation::class, 'quotation_id');

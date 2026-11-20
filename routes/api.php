@@ -359,6 +359,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/quotations/{id}/discount/approve', [QuotationController::class, 'approveDiscount']);
             Route::post('/quotations/{id}/discount/reject', [QuotationController::class, 'rejectDiscount']);
             Route::post('/sales-orders', [SalesOrderController::class, 'store']);
+            Route::patch('/sales-orders/{id}', [SalesOrderController::class, 'update']);
             Route::post('/sales-orders/{id}/confirm', [SalesOrderController::class, 'confirm']);
 
             // --- Period close: commands ---

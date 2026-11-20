@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Sales;
 
 use App\Http\Requests\Sales\StoreSalesOrderRequest;
+use App\Http\Requests\Sales\UpdateSalesOrderRequest;
 use App\Modules\Sales\Actions\ConfirmSalesOrder;
 use App\Modules\Sales\Actions\CreateSalesOrder;
+use App\Modules\Sales\Actions\UpdateSalesOrder;
 use App\Modules\Sales\Queries\GetSalesOrderQuery;
 use App\Modules\Sales\Queries\ListSalesOrdersQuery;
 use Illuminate\Http\JsonResponse;
@@ -18,6 +20,7 @@ final class SalesOrderController
         private readonly ListSalesOrdersQuery $listSalesOrdersQuery,
         private readonly GetSalesOrderQuery $getSalesOrderQuery,
         private readonly CreateSalesOrder $createSalesOrder,
+        private readonly UpdateSalesOrder $updateSalesOrder,
         private readonly ConfirmSalesOrder $confirmSalesOrder,
     ) {
     }
@@ -26,6 +29,8 @@ final class SalesOrderController
     {
         return response()->json($this->listSalesOrdersQuery->execute([
             'customerId' => $request->query('customerId'),
+            'orderTypeId' => $request->query('orderTypeId'),
+            'channel' => $request->query('channel'),
             'status' => $request->query('status'),
             'from' => $request->query('from'),
             'to' => $request->query('to'),
@@ -45,6 +50,11 @@ final class SalesOrderController
         $order = $this->createSalesOrder->execute($request->validated());
 
         return response()->json($order, 201);
+    }
+
+    public function update(string $id, UpdateSalesOrderRequest $request): JsonResponse
+    {
+        return response()->json($this->updateSalesOrder->execute($id, $request->validated()));
     }
 
     public function confirm(string $id): JsonResponse

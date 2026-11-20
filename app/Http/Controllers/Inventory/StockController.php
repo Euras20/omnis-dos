@@ -195,7 +195,12 @@ final class StockController
         $q = $request->query('q');
 
         return response()->json($this->orderTrackingQuery->execute(
-            $q !== null ? (string) $q : null
+            $q !== null ? (string) $q : null,
+            [
+                'customerId' => $request->query('customerId'),
+                'orderTypeId' => $request->query('orderTypeId'),
+                'channel' => $request->query('channel'),
+            ],
         ));
     }
 

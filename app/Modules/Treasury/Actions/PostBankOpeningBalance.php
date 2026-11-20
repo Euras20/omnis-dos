@@ -28,6 +28,7 @@ final class PostBankOpeningBalance
         private readonly CompanyContext $companyContext,
         private readonly PermissionChecker $permissionChecker,
         private readonly PostingService $postingService,
+        private readonly RoleResolver $roleResolver,
         private readonly AuditWriter $auditWriter,
     ) {
     }
@@ -119,15 +120,6 @@ final class PostBankOpeningBalance
 
     private function clearingId(string $companyId): string
     {
-        $id = \App\Models\Account::query()
-            ->where('company_id', $companyId)
-            ->where('code', '3900')
-            ->value('id');
-
-        if ($id === null) {
-            throw new BusinessRuleException('Opening balance clearing account (3900) is missing.');
-        }
-
-        return (string) $id;
+        return $this->roleResolver->id($companyId, 'OPENING_BALANCE_EQUITY');
     }
 }

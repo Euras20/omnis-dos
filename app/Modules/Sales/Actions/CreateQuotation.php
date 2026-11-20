@@ -110,6 +110,7 @@ final class CreateQuotation
             $requestId,
             $combinedTaxRate,
             $taxRates,
+            $channel,
         ) {
             $quotationId = Uuid::v7();
             $quotationNo = $this->nextNumber($companyId, $quotationDate, 'quotation');

@@ -21,6 +21,7 @@ final class AccountRoleCatalogue
             'SERVICE_REVENUE' => ['label' => 'Service revenue', 'accountClass' => 'income'],
             'WHOLESALE_REVENUE' => ['label' => 'Wholesale sales', 'accountClass' => 'income'],
             'RETAIL_REVENUE' => ['label' => 'Retail sales', 'accountClass' => 'income'],
+            'OPENING_BALANCE_EQUITY' => ['label' => 'Opening balance equity', 'accountClass' => 'equity'],
             'VAT_PAYABLE' => ['label' => 'VAT payable', 'accountClass' => 'liability'],
             'NHIL_PAYABLE' => ['label' => 'NHIL payable', 'accountClass' => 'liability'],
             'GETFUND_PAYABLE' => ['label' => 'GETFund payable', 'accountClass' => 'liability'],

@@ -28,6 +28,7 @@ final class CreateAccount
     public function __construct(
         private readonly CompanyContext $companyContext,
         private readonly PermissionChecker $permissionChecker,
+        private readonly RoleResolver $roleResolver,
         private readonly AuditWriter $auditWriter,
     ) {
     }
@@ -269,14 +270,7 @@ final class CreateAccount
             throw new BusinessRuleException('openingBalanceDate is required with an opening balance.');
         }
 
-        $clearing = Account::query()
-            ->where('company_id', $companyId)
-            ->where('code', '3900')
-            ->first();
-
-        if ($clearing === null) {
-            throw new BusinessRuleException('Opening balance clearing account (3900) is missing.');
-        }
+        $clearingId = $this->roleResolver->id($companyId, 'OPENING_BALANCE_EQUITY');
 
         $isDebit = $account->normal_balance === 'debit';
         $journal = new Journal;
@@ -296,9 +290,9 @@ final class CreateAccount
         $lineNo = 1;
         if ($isDebit) {
             $this->addJournalLine($journal, $lineNo++, $account->id, $amount, 0, $companyId);
-            $this->addJournalLine($journal, $lineNo, $clearing->id, 0, $amount, $companyId);
+            $this->addJournalLine($journal, $lineNo, $clearingId, 0, $amount, $companyId);
         } else {
-            $this->addJournalLine($journal, $lineNo++, $clearing->id, $amount, 0, $companyId);
+            $this->addJournalLine($journal, $lineNo++, $clearingId, $amount, 0, $companyId);
             $this->addJournalLine($journal, $lineNo, $account->id, 0, $amount, $companyId);
         }
 

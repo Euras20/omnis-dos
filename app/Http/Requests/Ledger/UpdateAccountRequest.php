@@ -24,6 +24,7 @@ final class UpdateAccountRequest extends FormRequest
             'description' => ['sometimes', 'nullable', 'string', 'max:512'],
             'category' => ['sometimes', 'string', 'in:asset,liability,equity,income,expense'],
             'detailType' => ['sometimes', 'nullable', 'string', 'max:80'],
+            'parentId' => ['sometimes', 'nullable', 'uuid'],
             'kind' => ['sometimes', 'string', 'in:header,detail'],
             'currency' => ['sometimes', 'nullable', 'string', 'size:3'],
             'isActive' => ['sometimes', 'boolean'],

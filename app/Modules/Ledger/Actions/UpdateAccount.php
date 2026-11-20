@@ -154,6 +154,23 @@ final class UpdateAccount
         if (array_key_exists('detailType', $data)) {
             $account->detail_type = $data['detailType'] !== null ? trim((string) $data['detailType']) : null;
         }
+        if (array_key_exists('parentId', $data)) {
+            $parentId = $data['parentId'] !== null && $data['parentId'] !== '' ? (string) $data['parentId'] : null;
+            if ($parentId === $account->id) {
+                throw new BusinessRuleException('An account cannot be its own parent.');
+            }
+            if ($parentId !== null) {
+                $parent = Account::query()
+                    ->where('company_id', $account->company_id)
+                    ->where('id', $parentId)
+                    ->first();
+                if ($parent === null) {
+                    throw new BusinessRuleException('Parent account not found.');
+                }
+                $account->category = $parent->category;
+            }
+            $account->parent_id = $parentId;
+        }
         if (array_key_exists('code', $data)) {
             $account->code = $this->normaliseCode($data['code'], $account);
         }

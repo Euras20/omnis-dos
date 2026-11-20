@@ -31,7 +31,7 @@ final class GetSalesOrderQuery
 
         $companyId = $this->companyContext->companyId();
         $order = SalesOrder::query()
-            ->with('lines')
+            ->with(['lines', 'customer', 'orderType'])
             ->where('company_id', $companyId)
             ->where('id', $id)
             ->first();
@@ -44,9 +44,12 @@ final class GetSalesOrderQuery
             'id' => $order->id,
             'orderNo' => $order->order_no,
             'customerId' => $order->customer_id,
+            'customerName' => $order->customer?->name,
+            'salesChannel' => $order->sales_channel,
             'quotationId' => $order->quotation_id,
             'customerPoRef' => $order->customer_po_ref,
             'orderTypeId' => $order->order_type_id,
+            'orderTypeName' => $order->orderType?->name,
             'orderDate' => $order->order_date?->format('Y-m-d'),
             'requiredDate' => $order->required_date?->format('Y-m-d'),
             'currency' => $order->currency,

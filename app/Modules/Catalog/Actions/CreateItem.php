@@ -103,9 +103,9 @@ final class CreateItem
             $item->reorder_point = $data['reorderPoint'] ?? $data['reorder'] ?? null;
             $item->safety_stock = $data['safetyStock'] ?? $data['safety'] ?? null;
             $item->inventory_account_code = $data['inventoryAccountCode'] ?? null;
-            $item->inv_account_id = $data['invAccountId'] ?? null;
-            $item->income_account_id = $data['incomeAccountId'] ?? null;
-            $item->cogs_account_id = $data['cogsAccountId'] ?? null;
+            $item->inv_account_id = $this->accountId($companyId, $data['invAccountId'] ?? null, 'Inventory asset account');
+            $item->income_account_id = $this->accountId($companyId, $data['incomeAccountId'] ?? null, 'Income account');
+            $item->cogs_account_id = $this->accountId($companyId, $data['cogsAccountId'] ?? null, 'Cost of sales account');
             $item->is_active = true;
             $item->save();
 
@@ -119,6 +119,25 @@ final class CreateItem
 
             return self::toArray($item);
         });
+    }
+
+    private function accountId(string $companyId, mixed $id, string $label): ?string
+    {
+        if ($id === null || $id === '' || $id === 'default') {
+            return null;
+        }
+
+        $id = (string) $id;
+        $exists = \App\Models\Account::query()
+            ->where('company_id', $companyId)
+            ->where('id', $id)
+            ->exists();
+
+        if (! $exists) {
+            throw new BusinessRuleException("{$label} is not an account in this company.");
+        }
+
+        return $id;
     }
 
     /**

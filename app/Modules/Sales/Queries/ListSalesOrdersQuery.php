@@ -41,6 +41,12 @@ final class ListSalesOrdersQuery
         if (! empty($filters['customerId'])) {
             $q->where('customer_id', (string) $filters['customerId']);
         }
+        if (! empty($filters['orderTypeId'])) {
+            $q->where('order_type_id', (string) $filters['orderTypeId']);
+        }
+        if (! empty($filters['channel'])) {
+            $q->where('sales_channel', strtolower((string) $filters['channel']));
+        }
         if (! empty($filters['status'])) {
             $q->where('status', (string) $filters['status']);
         }
@@ -72,6 +78,8 @@ final class ListSalesOrdersQuery
                     'id' => $r->id,
                     'orderNo' => $r->order_no,
                     'customerId' => $r->customer_id,
+                    'salesChannel' => $r->sales_channel,
+                    'orderTypeId' => $r->order_type_id,
                     'customerPoRef' => $r->customer_po_ref,
                     'orderDate' => $r->order_date?->format('Y-m-d'),
                     'status' => $r->status,
