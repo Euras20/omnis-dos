@@ -11,6 +11,7 @@ use App\Modules\Ledger\Domain\PostingKey;
 use App\Modules\Ledger\Domain\PostingLine;
 use App\Modules\Ledger\Domain\PostingRequest;
 use App\Modules\Ledger\Services\PostingService;
+use App\Modules\Ledger\Services\RoleResolver;
 use App\Shared\Audit\AuditWriter;
 use App\Shared\Company\CompanyContext;
 use App\Shared\Permissions\PermissionChecker;
