@@ -48,7 +48,18 @@ final class GetBankLineCandidatesQuery
         $from = $line->txn_date?->copy()->subDays(15)->toDateString();
         $to = $line->txn_date?->copy()->addDays(15)->toDateString();
 
-        // Journals that touch this bank account, posted, not already matched, net effect equals signed amount.
+        $bankGl = $line->bank_account_id;
+        $linked = \App\Models\CompanyBankAccount::query()
+            ->where('company_id', $companyId)
+            ->where(function ($q) use ($line) {
+                $q->where('id', $line->bank_account_id)
+                    ->orWhere('gl_account_id', $line->bank_account_id);
+            })
+            ->first();
+        if ($linked?->gl_account_id) {
+            $bankGl = $linked->gl_account_id;
+        }
+
         $candidates = Journal::query()
             ->where('company_id', $companyId)
             ->where('status', 'posted')
@@ -60,23 +71,26 @@ final class GetBankLineCandidatesQuery
                     ->where('bsl.company_id', $companyId)
                     ->where('bsl.status', 'matched');
             })
-            ->whereExists(function ($q) use ($companyId, $line, $signed) {
+            ->whereExists(function ($q) use ($companyId, $bankGl, $signed, $targetAbs) {
                 $q->select(DB::raw(1))
                     ->from('journal_line as jl')
                     ->whereColumn('jl.journal_id', 'journal.id')
                     ->where('jl.company_id', $companyId)
-                    ->where('jl.account_id', $line->bank_account_id)
+                    ->where('jl.account_id', $bankGl)
                     ->groupBy('jl.journal_id')
-                    ->havingRaw('SUM(jl.debit_minor - jl.credit_minor) = ?', [$signed]);
+                    ->havingRaw(
+                        'SUM(jl.debit_minor - jl.credit_minor) = ? OR ABS(SUM(jl.debit_minor - jl.credit_minor)) = ?',
+                        [$signed, $targetAbs]
+                    );
             })
             ->orderBy('posting_date')
             ->limit(20)
             ->get();
 
-        $items = $candidates->map(function (Journal $j) use ($line) {
+        $items = $candidates->map(function (Journal $j) use ($bankGl) {
             $effect = (int) JournalLine::query()
                 ->where('journal_id', $j->id)
-                ->where('account_id', $line->bank_account_id)
+                ->where('account_id', $bankGl)
                 ->selectRaw('COALESCE(SUM(debit_minor - credit_minor), 0) as effect')
                 ->value('effect');
 

@@ -179,6 +179,7 @@ final class PostInvoice
                     $claimedOrderLineIds[$salesOrderLineId] = true;
                 }
 
+                $soLine = null;
                 if ($salesOrderLineId !== null) {
                     $soLine = SalesOrderLine::query()
                         ->where('company_id', $companyId)
@@ -229,6 +230,9 @@ final class PostInvoice
                 }
 
                 $net = (int) round($qty * $unitPrice);
+                if ($soLine !== null && (float) $soLine->discount_percent > 0) {
+                    $net = (int) round($net * (1 - (float) $soLine->discount_percent / 100));
+                }
                 $tax = TaxBreakdown::fromNet($net, $taxRates);
 
                 $lineId = Uuid::v7();

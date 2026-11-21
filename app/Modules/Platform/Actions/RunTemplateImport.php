@@ -349,8 +349,9 @@ final class RunTemplateImport
      */
     private function insertBill(array $r, string $companyId, ?string $actorId, array $partyByCode, array $accountByCode): void
     {
+        $billId = Uuid::v7();
         Bill::query()->create([
-            'id' => Uuid::v7(),
+            'id' => $billId,
             'company_id' => $companyId,
             'bill_no' => $r['bill_no'],
             'supplier_id' => $partyByCode[$r['supplier_code']],
@@ -367,6 +368,31 @@ final class RunTemplateImport
             'created_by' => $actorId,
             'request_id' => $this->companyContext->requestId(),
         ]);
+
+        $gross = $this->money($r['gross']);
+        if ($gross > 0) {
+            $supplierId = $partyByCode[$r['supplier_code']];
+            $clearing = app(\App\Modules\Ledger\Services\RoleResolver::class)
+                ->id($companyId, 'OPENING_BALANCE_EQUITY');
+            $ap = \App\Models\Party::query()->find($supplierId)?->ap_account_id
+                ?? app(\App\Modules\Ledger\Services\RoleResolver::class)->id($companyId, 'TRADE_PAYABLE');
+            app(\App\Modules\Ledger\Services\PostingService::class)->post(new \App\Modules\Ledger\Domain\PostingRequest(
+                companyId: $companyId,
+                postingDate: $r['bill_date'],
+                postingKey: \App\Modules\Ledger\Domain\PostingKey::make('opening_balance', $billId, 'bill'),
+                sourceType: 'opening_balance',
+                sourceId: $billId,
+                eventType: 'supplier_opening',
+                description: 'Imported open bill '.$r['bill_no'],
+                lines: [
+                    new \App\Modules\Ledger\Domain\PostingLine(accountId: $clearing, debitMinor: $gross, creditMinor: 0, partyId: $supplierId),
+                    new \App\Modules\Ledger\Domain\PostingLine(accountId: $ap, debitMinor: 0, creditMinor: $gross, partyId: $supplierId),
+                ],
+                actorId: $actorId,
+                requestId: $this->companyContext->requestId(),
+                currency: $this->currency($r['currency']),
+            ));
+        }
     }
 
     /**

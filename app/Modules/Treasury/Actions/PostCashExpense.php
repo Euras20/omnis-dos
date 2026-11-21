@@ -47,7 +47,19 @@ final class PostCashExpense
         $companyId = $this->companyContext->companyId();
         $expenseDate = (string) ($data['expenseDate'] ?? $data['date'] ?? '');
         $paidFromAccountId = (string) ($data['paidFromAccountId'] ?? $data['paid_from_account_id'] ?? '');
-        $rawLines = $data['lines'] ?? [];
+        $rawLines = $data['lines'] ?? $data['items'] ?? [];
+        if (! is_array($rawLines) || $rawLines === []) {
+            $amount = (int) ($data['amountMinor'] ?? $data['amount_minor'] ?? 0);
+            $accountId = (string) ($data['expenseAccountId'] ?? $data['expense_account_id'] ?? '');
+            if ($amount > 0 && $accountId !== '') {
+                $rawLines = [[
+                    'expenseAccountId' => $accountId,
+                    'amountMinor' => $amount,
+                    'taxMinor' => (int) ($data['taxMinor'] ?? 0),
+                    'description' => $data['description'] ?? $data['memo'] ?? '',
+                ]];
+            }
+        }
 
         if ($expenseDate === '' || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $expenseDate)) {
             throw new BusinessRuleException('expenseDate must be YYYY-MM-DD.');

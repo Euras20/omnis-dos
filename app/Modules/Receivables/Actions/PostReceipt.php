@@ -179,8 +179,9 @@ final class PostReceipt
             // Journal: Dr cash, Dr WHT receivable; Cr AR (allocated), Cr advances (remainder)
             $postingLines = [];
             if ($cashMinor > 0) {
+                $cashId = $this->resolvePaidInto($companyId, $data, $cashAccountCode);
                 $postingLines[] = new PostingLine(
-                    accountId: $this->accountResolver->idByCashCode($companyId, $cashAccountCode),
+                    accountId: $cashId,
                     debitMinor: $cashMinor,
                     creditMinor: 0,
                     partyId: $customerId,
@@ -260,6 +261,29 @@ final class PostReceipt
 
             return $this->toArray(Receipt::query()->with('allocations')->findOrFail($receiptId), $remainder);
         });
+    }
+
+    private function resolvePaidInto(string $companyId, array $data, string $cashAccountCode): string
+    {
+        $bankId = $data['bankAccountId'] ?? $data['paidIntoAccountId'] ?? $data['paidInto'] ?? null;
+        if (is_string($bankId) && $bankId !== '') {
+            $gl = \App\Models\CompanyBankAccount::query()
+                ->where('company_id', $companyId)
+                ->where('id', $bankId)
+                ->value('gl_account_id');
+            if ($gl !== null) {
+                return (string) $gl;
+            }
+            $isAccount = \App\Models\Account::query()
+                ->where('company_id', $companyId)
+                ->where('id', $bankId)
+                ->exists();
+            if ($isAccount) {
+                return $bankId;
+            }
+        }
+
+        return $this->accountResolver->idByCashCode($companyId, $cashAccountCode);
     }
 
     private function nextNumber(string $companyId, string $date, string $docType): string

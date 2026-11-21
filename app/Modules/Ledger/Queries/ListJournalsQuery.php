@@ -36,7 +36,9 @@ final class ListJournalsQuery
             ->orderByDesc('journal_no');
 
         $status = $filters['status'] ?? 'posted';
-        if (is_string($status) && $status !== 'all') {
+        if (is_string($status) && $status === 'posted') {
+            $query->whereIn('status', ['posted', 'reversed']);
+        } elseif (is_string($status) && $status !== 'all') {
             $query->where('status', $status);
         }
 

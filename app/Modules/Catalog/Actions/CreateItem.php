@@ -45,7 +45,7 @@ final class CreateItem
             }
 
             $categoryCode = isset($data['categoryCode']) ? strtoupper(trim((string) $data['categoryCode'])) : null;
-            if ($categoryCode !== null) {
+            if ($categoryCode !== null && $categoryCode !== '') {
                 $categoryExists = ItemCategory::query()
                     ->where('company_id', $companyId)
                     ->where('code', $categoryCode)
@@ -54,6 +54,8 @@ final class CreateItem
                 if (! $categoryExists) {
                     throw new BusinessRuleException("Item category '{$categoryCode}' was not found or is inactive.");
                 }
+            } else {
+                $categoryCode = null;
             }
 
             $defaultLocationId = $data['defaultLocationId'] ?? null;
@@ -108,6 +110,16 @@ final class CreateItem
             $item->cogs_account_id = $this->accountId($companyId, $data['cogsAccountId'] ?? null, 'Cost of sales account');
             $item->is_active = true;
             $item->save();
+
+            $openingQty = $data['openingQty'] ?? $data['opening_qty'] ?? null;
+            if ($openingQty !== null && (float) $openingQty > 0) {
+                app(\App\Modules\Inventory\Actions\PostItemOpeningBalance::class)->execute($item->id, [
+                    'qty' => $openingQty,
+                    'unitCostMinor' => (int) ($data['openingUnitCostMinor'] ?? $data['opening_unit_cost'] ?? $data['unitCostMinor'] ?? $item->standard_cost_minor),
+                    'locationId' => $data['openingLocationId'] ?? $data['opening_location_id'] ?? $data['locationId'] ?? $item->default_location_id,
+                    'asOfDate' => $data['openingDate'] ?? $data['opening_date'] ?? $data['asOfDate'] ?? now()->toDateString(),
+                ]);
+            }
 
             $this->auditWriter->write(
                 action: 'item.created',

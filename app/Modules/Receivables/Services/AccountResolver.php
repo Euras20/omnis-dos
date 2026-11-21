@@ -23,6 +23,9 @@ final class AccountResolver
         'covid' => 'COVID_PAYABLE',
         'wht_receivable' => 'WHT_RECEIVABLE',
         'cash' => 'BANK_CASH',
+        'cogs' => 'COGS',
+        'claimable_tax' => 'CLAIMABLE_TAX',
+        'ap' => 'TRADE_PAYABLE',
     ];
 
     public function __construct(

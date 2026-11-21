@@ -35,7 +35,7 @@ final class StockCountTemplateQuery
             ->whereHas('stockCount', function ($query) use ($companyId) {
                 $query->where('company_id', $companyId)
                     ->whereNotNull('location_id')
-                    ->where('status', '!=', 'rejected');
+                    ->whereIn('status', ['draft', 'awaiting_supervisor']);
             })
             ->pluck('item_id')
             ->unique()

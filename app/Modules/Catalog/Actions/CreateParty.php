@@ -90,6 +90,20 @@ final class CreateParty
             $party->is_active = true;
             $party->save();
 
+            $opening = $data['openingBalanceMinor']
+                ?? $data['opening_balance_minor']
+                ?? $data['openingAmount']
+                ?? $data['opening_balance']
+                ?? null;
+            if ($opening !== null && (int) $opening > 0 && $party->party_type === 'supplier') {
+                app(\App\Modules\Payables\Actions\PostSupplierOpeningBalance::class)->execute($party->id, [
+                    'amountMinor' => (int) $opening,
+                    'asOfDate' => $data['openingDate'] ?? $data['opening_date'] ?? now()->toDateString(),
+                    'dueDate' => $data['openingDueDate'] ?? $data['opening_due_date'] ?? null,
+                    'reference' => $data['openingReference'] ?? $data['opening_reference'] ?? null,
+                ]);
+            }
+
             $this->auditWriter->write(
                 action: 'party.created',
                 entityType: 'party',

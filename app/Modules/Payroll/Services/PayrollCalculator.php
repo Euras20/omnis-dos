@@ -28,7 +28,7 @@ final class PayrollCalculator
      */
     public function calculate(Employee $employee, int $otHours, array $rules, bool $overtimeApproved = false): array
     {
-        $basic = (int) $employee->basic_minor;
+        $basic = (int) ($employee->basic_minor ?? 0);
         $monthlyHours = (int) ($rules['monthlyHours'] ?? 176);
         $otMultiplier = (float) ($rules['otMultiplier'] ?? 1.5);
         $hourly = $monthlyHours > 0 && $basic > 0 ? (int) round($basic / $monthlyHours) : 0;
@@ -40,7 +40,7 @@ final class PayrollCalculator
 
         $ssnitMin = (int) ($rules['ssnitMinMinor'] ?? 58780);
         $ssnitMax = (int) ($rules['ssnitMaxMinor'] ?? 6900000);
-        $insurable = min($ssnitMax, max($ssnitMin, $basic));
+        $insurable = $basic > 0 ? min($ssnitMax, max($ssnitMin, $basic)) : 0;
 
         $ssnitEmpPct = (float) ($rules['ssnitEmp'] ?? $rules['ssfEmployeePct'] ?? 5.5);
         $ssnitErPct = (float) ($rules['ssnitEr'] ?? $rules['ssfEmployerPct'] ?? 13.0);
@@ -79,7 +79,7 @@ final class PayrollCalculator
             $paye = $this->computePaye($taxable, $this->normalizeBands($rules['payeBands'] ?? $rules['paye'] ?? []));
         }
 
-        $net = $gross - $empSS - $paye - $otTax;
+        $net = max(0, $gross - $empSS - $paye - $otTax);
 
         $capHours = (int) ($rules['otMonthlyCapHours'] ?? 24);
         $exception = null;
@@ -134,12 +134,12 @@ final class PayrollCalculator
             'otMultiplier' => 1.5,
             'otMonthlyCapHours' => 24,
             'payeBands' => [
-                ['width' => 49000, 'rate' => 0],
-                ['width' => 11000, 'rate' => 5],
-                ['width' => 13000, 'rate' => 10],
-                ['width' => 316667, 'rate' => 17.5],
+                ['width' => 58800, 'rate' => 0],
+                ['width' => 8000, 'rate' => 5],
+                ['width' => 10000, 'rate' => 10],
+                ['width' => 290000, 'rate' => 17.5],
                 ['width' => 1600000, 'rate' => 25],
-                ['width' => 3052000, 'rate' => 30],
+                ['width' => 3033200, 'rate' => 30],
                 ['width' => null, 'rate' => 35],
             ],
         ];

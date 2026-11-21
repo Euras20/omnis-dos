@@ -57,7 +57,7 @@ final class PostBill
         $taxMinor = (int) ($data['taxMinor'] ?? 0);
         $grossMinor = (int) ($data['grossMinor'] ?? ($netMinor + $taxMinor));
         $expenseAccountId = isset($data['expenseAccountId']) ? (string) $data['expenseAccountId'] : null;
-        $expenseAccountCode = (string) ($data['expenseAccountCode'] ?? '5000');
+        $expenseAccountCode = (string) ($data['expenseAccountCode'] ?? 'cogs');
         $memo = isset($data['memo']) ? trim((string) $data['memo']) : null;
         $dueDate = isset($data['dueDate']) ? (string) $data['dueDate'] : null;
         $requestId = $this->companyContext->requestId();
