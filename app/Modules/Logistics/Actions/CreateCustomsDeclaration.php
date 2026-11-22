@@ -78,6 +78,20 @@ final class CreateCustomsDeclaration
 
             $declNo = sprintf('CD-%s-%05d', $year, $value);
 
+            $brokerId = isset($data['brokerId']) && $data['brokerId'] !== ''
+                ? (string) $data['brokerId']
+                : null;
+            if ($brokerId !== null) {
+                $broker = Party::query()
+                    ->where('company_id', $companyId)
+                    ->where('id', $brokerId)
+                    ->where('party_type', 'broker')
+                    ->first();
+                if ($broker === null) {
+                    throw new BusinessRuleException('brokerId must be a broker.');
+                }
+            }
+
             $decl = new CustomsDeclaration;
             $decl->id = Uuid::v7();
             $decl->company_id = $companyId;
